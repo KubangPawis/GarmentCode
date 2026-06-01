@@ -105,6 +105,41 @@ To apply the table to a new corpus item, score it once on each of the seven axes
 
 ## §5 The bridging problem (image → parameters)
 
+The proposed pipeline's most upstream input is a multi-view image scan of a real garment, but GarmentCode runs only forward (`parameters → garment`, §2). To use it as a reconstruction backend we would need the **inverse** step: `images → design + body parameters`. That inverse model is **not in the repository**. The closest thing, `pattern_fitter.py`, does something narrower — it refits an *already-chosen* design to a different set of body measurements. It assumes the design is already known; it does not infer the design from a picture.
+
+It is tempting to assume a strong enough inverse model would close the gaps. It cannot, and the reason is structural. Any inverse model — even a hypothetically *perfect* one — can only emit parameters that the forward model accepts, and the forward model's vocabulary is exactly the library inventoried in §3 and §8. So when the scanned garment carries a ❌ feature (a tied sash, a sheer overlay, a cascade ruffle), there is no parameter to set; the inverse model's loss is minimized by snapping the feature to the nearest *supported* staple. The ❌ features are therefore **silently collapsed**, not flagged. Bridging does not raise the expressivity ceiling — it just lets the pipeline reach it from images instead of hand-authored YAML.
+
+```
+   multi-view images
+          │
+          ▼
+   ┌─────────────────────┐
+   │  INVERSE MODEL       │   ← NOT in repo (pattern_fitter.py
+   │  images → params     │     only refits a known design to body sizes)
+   └─────────────────────┘
+          │
+          │  can only emit params the forward model accepts
+          ▼
+   ❌ features collapse to nearest supported staple HERE
+          │
+          ▼
+   ┌─────────────────────┐
+   │  FORWARD GENERATOR   │   ← GarmentCode library + MetaGarment
+   │  params → pattern    │
+   └─────────────────────┘
+          │
+          ▼
+   2D pattern → (optional Warp sim) → 3D mesh
+          │
+          ▼
+   appearance bridged SEPARATELY: scanned texture → UVs
+   (recovers look, not construction)
+```
+
+This framing also clarifies what GarmentCodeData is for. Its stated purpose is garment reconstruction, and the dataset exists precisely to *train* inverse models of this kind. That is genuinely useful — but only for the **supported subset**, the garments whose defining features all sit on ✅ (and at worst tunable 🟡) axes. For the couture subset it trains a model to collapse the very features that mattered.
+
+Finally, appearance is bridged on a completely separate track: the scanned texture is projected onto the mesh's UVs (§2). This recovers how the garment *looks* — the print, the color — but it changes nothing about *construction*. A sheer overlay painted as a texture onto a single opaque layer still has one layer; the layering, the cascade, and the tie remain absent underneath the picture.
+
 ## §6 Cost of closing the gaps
 
 ## §7 Alternatives & decision framework
