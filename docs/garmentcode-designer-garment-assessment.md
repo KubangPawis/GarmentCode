@@ -45,6 +45,42 @@ The point to carry forward: the library of garment programs plus the `MetaGarmen
 
 ## §3 Case study — the DVF dress teardown
 
+This is the centerpiece. We decompose the dress feature by feature and judge each against the library, using a three-symbol legend that the rest of the memo reuses unchanged.
+
+> Legend: ✅ supported · 🟡 out-of-range (param/range gap, extendable by tuning) · ❌ categorical gap (no vocabulary; needs new code or impossible).
+
+| Feature in the image | Verdict | Closest library capability |
+|---|---|---|
+| Maxi A-line / full skirt silhouette | ✅ | `circle_skirt.SkirtCircle`, `skirt_paneled.SkirtManyPanels` |
+| Fitted bodice + waist seam | ✅ | `bodice.FittedShirt` / `bodice.BodiceHalf` |
+| Long sleeves | ✅ | `sleeves.Sleeve` |
+| Round neckline | ✅ | `collars` (front/back collar set) |
+| Tiered (stacked-level) skirt | ✅ | `skirt_levels.SkirtLevels` |
+| Asymmetric high-low hem | 🟡 | `circle_skirt.AsymmSkirtCircle` — exists, but separately from tiers |
+| Single flared / ruffled cuff | 🟡 | `sleeves` `connect_ruffle` + `cuff` (one ruffle, `CuffBand`/`CuffSkirt`) |
+| Flat waist-band piece | 🟡 | `bands.StraightWB` / `FittedWB` (a band, not a tie) |
+| Multi-tier cascading ruffle sleeves (2–3 stacked flounces) | ❌ | none |
+| Cascading diagonal ruffle-wrap overlay on skirt | ❌ | none |
+| Asymmetric AND tiered AND cascading simultaneously | ❌ | no such composition |
+| Tied sash bow with hanging tails | ❌ | a knotted bow is a draped/posed result, not a pattern |
+| Keyhole / plunging slit neckline | ❌ | collars limited to V-neck / square / turtle / lapel / hood |
+| Two-layer sheer overlay over opaque slip | ❌ | single-layer; `MetaGarment` = one upper + one bottom + one belt |
+| Floral print + lurex shimmer + sheer chiffon look | ❌ | not a pattern concept; texture/material/render only |
+| Soft fluttering chiffon drape | 🟡 | sim material setting; chiffon flutter is hard for cloth sim generally |
+
+Read top to bottom, the matrix splits cleanly. The ✅ rows are the garment's *generic* properties — it is long-sleeved, fitted at the bodice, full and tiered in the skirt, round at the neck. These are exactly the staples the library was built around, so each maps onto a named class (`Sleeve`, `FittedShirt`/`BodiceHalf`, `SkirtLevels`, the `collars` set). The 🟡 rows are features the library *gestures at* but cannot reach in the configuration the dress needs: `AsymmSkirtCircle` gives asymmetry and `SkirtLevels` gives tiers, but they are separate classes that do not compose; `connect_ruffle` plus a cuff gives *one* ruffle, not a stack; `StraightWB`/`FittedWB` give a flat band where the dress has a knotted sash. These are reachable in principle by writing more code (§6), not by tuning an existing parameter.
+
+The ❌ rows cluster into six themes, and each is a *vocabulary* gap — there is simply nothing in the design language to map the feature onto, so the question "what parameter value produces it?" has no answer:
+
+- **Structural asymmetry combined with tiering and cascade.** The library has asymmetry (`AsymmSkirtCircle`) and tiering (`SkirtLevels`) as disjoint classes; the dress needs them fused with a diagonal cascade, and there is no composite class that expresses all three at once.
+- **True layering.** `MetaGarment`'s one-upper/one-bottom/one-band topology has no slot for a second, independently-draped garment, so a sheer overlay registered over an opaque slip cannot be represented at all.
+- **Cascade ruffles.** Sleeve ruffling is a single `connect_ruffle`/cuff event and skirt levels stack vertically; neither produces the stacked-flounce cascade on the sleeves nor the diagonal ruffle-wrap on the skirt.
+- **Draped ties.** A tied sash bow with hanging tails is a posed/draped result of manipulating fabric, not a flat pattern piece; `bands` only emits flat straight or fitted bands.
+- **Complex necklines.** `collars.py` tops out at V-neck, square, turtle, lapel, and hood — a keyhole or plunging slit is not in the set.
+- **Appearance.** Floral print, lurex shimmer, and sheer chiffon are not pattern concepts anywhere; the generator has no place to record them.
+
+The punchline is uncomfortable and decisive: the ❌ rows are precisely the features that make this dress visually distinctive. The ✅ rows describe a generic long-sleeve tiered maxi that a hundred other garments also satisfy. So when GarmentCode runs, the *silhouette family* survives — and the garment's *identity* does not.
+
 ## §4 Generalized taxonomy — scaling to the corpus
 
 ## §5 The bridging problem (image → parameters)
