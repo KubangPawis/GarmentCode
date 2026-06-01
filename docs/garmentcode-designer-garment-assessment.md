@@ -142,6 +142,23 @@ Finally, appearance is bridged on a completely separate track: the scanned textu
 
 ## §6 Cost of closing the gaps
 
+Some of the gaps are closeable, and it is worth being precise about which. Extending the garment-program library is a real, well-defined lever: GarmentCode's library is a set of `Component`/`Panel` classes, and new ones can be written. A keyhole collar class, a stacked-flounce ruffle component, an asymmetric-tiered cascade skirt — each is buildable in principle. But the work is **per-construction-type engineering**, not a config change. Every new class means designing the panel geometry, defining its interfaces, wiring its stitching, attaching its sim labels, and validating that it drapes correctly. There is no parameter that turns these on; someone writes and tests each one.
+
+Some gaps cannot be closed by library work at all, ever. Fabric print, sheer, and lurex are appearance, not pattern — they live in the render/texture stage and no panel class will ever produce them (and texture projection, §5, recovers look but not construction). True integrated multi-layer interaction — a sheer overlay that drapes *against* an opaque slip with correct registration — exceeds the single-layer `MetaGarment` topology and would need a layering model with drape registration, not just one more class. A physically tied knot or bow is a posing/simulation artifact of manipulating fabric; it is not a flat pattern piece and cannot be emitted by the generator.
+
+The rough effort shape, by gap **(Medium confidence)** — T-shirt sizes, where S/M/L is per-feature design + panel geometry + interfaces + stitching + sim labels + validation:
+
+| Gap | Closeable by library work? | Rough effort |
+|---|---|---|
+| Keyhole / slit necklines | Yes — new collar class | S |
+| Multi-tier cascading ruffles (sleeve & hem) | Yes — new ruffle/flounce component | M |
+| Asymmetric + tiered + cascading skirt | Yes — new composite skirt class | M–L |
+| Integrated two-layer sheer-over-slip | Partly — needs layering model + drape registration | L |
+| Tied sash bow with tails | No (pattern); sim/pose only | — |
+| Print / sheer / lurex appearance | No (out-of-band texture/render) | — |
+
+The honest framing: this is a **library R&D track**, sized by the feature diversity of the corpus rather than a single fixed cost, and even fully funded it cannot reach the "No" rows — the tied sash and the print/sheer/lurex appearance — which are among the dress's defining traits. Closing every closeable gap still leaves the garment short of a faithful twin.
+
 ## §7 Alternatives & decision framework
 
 ## §8 Appendix
