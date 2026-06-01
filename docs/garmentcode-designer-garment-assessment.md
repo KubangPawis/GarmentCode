@@ -25,11 +25,13 @@ The most damning, defining traits — each a categorical gap:
 | Floral print + lurex shimmer + sheer chiffon | ❌ |
 | Keyhole / plunging slit neckline | ❌ |
 
+*❌ = categorical gap: no design vocabulary to express this (full legend and per-feature analysis in §3).*
+
 ## §1 Context & scope
 
 We assessed GarmentCode at commit `db94b2c` against the published `pygarment` v2.0.2 library. The concrete test case is the DVF floral chiffon tiered-ruffle maxi dress catalogued as `DVF_3008_R1`. We picked it deliberately: it is a representative designer/couture item, not a staple, and it exercises nearly every dimension where a parametric pattern generator can fail.
 
-Its construction, annotated: a printed sheer chiffon shell shot through with lurex thread; a round neck broken by a deep keyhole/plunging slit; long bell sleeves finished with stacked ruffle flounces rather than a single cuff; a fitted bodice joined to the skirt at a waist seam; a tied sash bow with hanging tails at the waist; and an asymmetric high-low, tiered, cascading ruffle skirt that reads as a *sheer overlay* draped over a separate opaque yellow slip. The garment's identity lives in the combination of these features, not in any one of them.
+Its construction, annotated: a printed sheer chiffon shell shot through with lurex thread; a round neck broken by a deep keyhole/plunging slit (the round neckline itself maps cleanly to GarmentCode, but the keyhole cutout breaking it does not — see §3); long bell sleeves finished with stacked ruffle flounces rather than a single cuff; a fitted bodice joined to the skirt at a waist seam; a tied sash bow with hanging tails at the waist; and an asymmetric high-low, tiered, cascading ruffle skirt that reads as a *sheer overlay* draped over a separate opaque yellow slip. The garment's identity lives in the combination of these features, not in any one of them.
 
 The fidelity bar for this memo is deliberately strict. "Genuinely recreate" means **visual and constructional fidelity sufficient to stand in as a digital twin** of *this* garment — the layering, the ruffle cascade, the tie, the print all present and correct. It does **not** mean "produces something that evokes the same silhouette family." A long-sleeve fitted maxi that omits the layering, the cascade, the tie, and the print is a different garment that happens to share an outline; under our bar that is a failure, not a near-miss.
 
@@ -54,7 +56,7 @@ This is the centerpiece. We decompose the dress feature by feature and judge eac
 | Maxi A-line / full skirt silhouette | ✅ | `circle_skirt.SkirtCircle`, `skirt_paneled.SkirtManyPanels` |
 | Fitted bodice + waist seam | ✅ | `bodice.FittedShirt` / `bodice.BodiceHalf` |
 | Long sleeves | ✅ | `sleeves.Sleeve` |
-| Round neckline | ✅ | `collars` (front/back collar set) |
+| Round neckline | ✅ | `collars` — `CircleNeckHalf` / `CircleArcNeckHalf` |
 | Tiered (stacked-level) skirt | ✅ | `skirt_levels.SkirtLevels` |
 | Asymmetric high-low hem | 🟡 | `circle_skirt.AsymmSkirtCircle` — exists, but separately from tiers |
 | Single flared / ruffled cuff | 🟡 | `sleeves` `connect_ruffle` + `cuff` (one ruffle, `CuffBand`/`CuffSkirt`) |
@@ -63,12 +65,12 @@ This is the centerpiece. We decompose the dress feature by feature and judge eac
 | Cascading diagonal ruffle-wrap overlay on skirt | ❌ | none |
 | Asymmetric AND tiered AND cascading simultaneously | ❌ | no such composition |
 | Tied sash bow with hanging tails | ❌ | a knotted bow is a draped/posed result, not a pattern |
-| Keyhole / plunging slit neckline | ❌ | collars limited to V-neck / square / turtle / lapel / hood |
+| Keyhole / plunging slit neckline | ❌ | neckline functions only shape the open neckline contour; a keyhole is a closed-top interior cutout, which none can express |
 | Two-layer sheer overlay over opaque slip | ❌ | single-layer; `MetaGarment` = one upper + one bottom + one belt |
 | Floral print + lurex shimmer + sheer chiffon look | ❌ | not a pattern concept; texture/material/render only |
 | Soft fluttering chiffon drape | 🟡 | sim material setting; chiffon flutter is hard for cloth sim generally |
 
-Read top to bottom, the matrix splits cleanly. The ✅ rows are the garment's *generic* properties — it is long-sleeved, fitted at the bodice, full and tiered in the skirt, round at the neck. These are exactly the staples the library was built around, so each maps onto a named class (`Sleeve`, `FittedShirt`/`BodiceHalf`, `SkirtLevels`, the `collars` set). The 🟡 rows are features the library *gestures at* but cannot reach in the configuration the dress needs: `AsymmSkirtCircle` gives asymmetry and `SkirtLevels` gives tiers, but they are separate classes that do not compose; `connect_ruffle` plus a cuff gives *one* ruffle, not a stack; `StraightWB`/`FittedWB` give a flat band where the dress has a knotted sash. These are reachable in principle by writing more code (§6), not by tuning an existing parameter.
+Read top to bottom, the matrix splits cleanly. The ✅ rows are the garment's *generic* properties — it is long-sleeved, fitted at the bodice, full and tiered in the skirt, round at the neck. These are exactly the staples the library was built around, so each maps onto a named class (`Sleeve`, `FittedShirt`/`BodiceHalf`, `SkirtLevels`, the `collars` set — which covers turtle, hood, and lapel collars plus round/circle-arc, V-neck, square, trapezoid, curvy, and Bézier neckline shapes). The 🟡 rows are features the library *gestures at* but cannot reach in the configuration the dress needs: `AsymmSkirtCircle` gives asymmetry and `SkirtLevels` gives tiers, but they are separate classes that do not compose; `connect_ruffle` plus a cuff gives *one* ruffle, not a stack; `StraightWB`/`FittedWB` give a flat band where the dress has a knotted sash. These are reachable in principle by writing more code (§6), not by tuning an existing parameter.
 
 The ❌ rows cluster into six themes, and each is a *vocabulary* gap — there is simply nothing in the design language to map the feature onto, so the question "what parameter value produces it?" has no answer:
 
@@ -76,7 +78,7 @@ The ❌ rows cluster into six themes, and each is a *vocabulary* gap — there i
 - **True layering.** `MetaGarment`'s one-upper/one-bottom/one-band topology has no slot for a second, independently-draped garment, so a sheer overlay registered over an opaque slip cannot be represented at all.
 - **Cascade ruffles.** Sleeve ruffling is a single `connect_ruffle`/cuff event and skirt levels stack vertically; neither produces the stacked-flounce cascade on the sleeves nor the diagonal ruffle-wrap on the skirt.
 - **Draped ties.** A tied sash bow with hanging tails is a posed/draped result of manipulating fabric, not a flat pattern piece; `bands` only emits flat straight or fitted bands.
-- **Complex necklines.** `collars.py` tops out at V-neck, square, turtle, lapel, and hood — a keyhole or plunging slit is not in the set.
+- **Complex necklines.** `collars.py` offers a fairly rich set — turtle, hood, and lapel collars plus round/circle-arc, V-neck, square, trapezoid, curvy, and Bézier neckline shapes — but every one of these functions only shapes the *open neckline contour* cut from the top edge of the bodice. A keyhole or plunging slit is a *closed-top interior cutout*: the neckline closes around the neck, then opens below. None of the contour functions or collar components can express that closed-top opening.
 - **Appearance.** Floral print, lurex shimmer, and sheer chiffon are not pattern concepts anywhere; the generator has no place to record them.
 
 The punchline is uncomfortable and decisive: the ❌ rows are precisely the features that make this dress visually distinctive. The ✅ rows describe a generic long-sleeve tiered maxi that a hundred other garments also satisfy. So when GarmentCode runs, the *silhouette family* survives — and the garment's *identity* does not.
@@ -91,11 +93,11 @@ The dress teardown generalizes. Rather than re-running a full analysis for every
 | Layering | single layer | lining as a 2nd separate garment (2 runs, no registration) | integrated sheer-over-slip |
 | Ruffles / gathers | single edge ruffle (`ruffle` interface param) | one cuff or one skirt level | multi-tier cascade |
 | Closures & ties | seam / dart | flat band (`StraightWB`) | tied knot / bow / draped tie |
-| Necklines / collars | V / square / turtle / lapel / hood | minor variants | keyhole / slit / sculpted |
+| Necklines / collars | turtle, hood, lapel + round/circle-arc, V, square, trapezoid, curvy, Bézier necklines | minor variants | keyhole / slit (closed-top interior cutout) / sculpted |
 | Appearance | solid color (render-side) | — | any print, sheer, metallic |
 | Drape / fabric | stable wovens | soft fabrics | chiffon flutter, fine gathers |
 
-Each row names a real construction concern. The first asks whether the garment's panels mirror left-to-right; GarmentCode is built around symmetric panels and only mildly tolerant of off-center construction, with no representation for a structurally one-sided cut. The second asks whether the garment is one shell or several interacting layers; the generator is single-layer, and the most it can do is run twice for an unregistered lining, never an integrated sheer-over-slip. The third distinguishes a single gathered edge (the `ruffle` interface param) from one localized gather (a cuff or one skirt level) from a stacked cascade, which has no class. The fourth separates structural seams and darts from flat bands (`StraightWB`) from draped knots and bows, which are posed artifacts rather than pattern pieces. The fifth is bounded by the fixed `collars` set, so anything sculpted or slit falls off the end. The sixth is render-side only — solid color survives, but any print, sheer, or metallic finish is not a pattern concept at all. The seventh captures how forgiving the cloth sim is: stable wovens behave, soft fabrics are harder, and fine chiffon flutter is at the edge of what cloth sim does well in general.
+Each row names a real construction concern. The first asks whether the garment's panels mirror left-to-right; GarmentCode is built around symmetric panels and only mildly tolerant of off-center construction, with no representation for a structurally one-sided cut. The second asks whether the garment is one shell or several interacting layers; the generator is single-layer, and the most it can do is run twice for an unregistered lining, never an integrated sheer-over-slip. The third distinguishes a single gathered edge (the `ruffle` interface param) from one localized gather (a cuff or one skirt level) from a stacked cascade, which has no class. The fourth separates structural seams and darts from flat bands (`StraightWB`) from draped knots and bows, which are posed artifacts rather than pattern pieces. The fifth is bounded by the fixed `collars` set, whose functions only shape the open neckline contour cut from the bodice's top edge, so anything sculpted or any closed-top interior cutout like a keyhole/slit falls outside what it can express. The sixth is render-side only — solid color survives, but any print, sheer, or metallic finish is not a pattern concept at all. The seventh captures how forgiving the cloth sim is: stable wovens behave, soft fabrics are harder, and fine chiffon flutter is at the edge of what cloth sim does well in general.
 
 This gives a one-line decision rule:
 
@@ -187,7 +189,7 @@ The recommendation carries an explicit conditional trigger, because corpus mix i
 - `tee.py` — TorsoFrontHalfPanel, TorsoBackHalfPanel
 - `bodice.py` — BodiceFrontHalf, BodiceBackHalf, BodiceHalf, Shirt, FittedShirt
 - `sleeves.py` — SleevePanel, Sleeve
-- `collars.py` — VNeckHalf, SquareNeckHalf, NoPanelsCollar, Turtle, SimpleLapel(Panel), Hood(Panel/Hood2Panels)
+- `collars.py` — neckline shape functions `VNeckHalf, SquareNeckHalf, TrapezoidNeckHalf, CurvyNeckHalf, CircleArcNeckHalf, CircleNeckHalf, Bezier2NeckHalf`; collar components `NoPanelsCollar, Turtle, SimpleLapelPanel/SimpleLapel, HoodPanel/Hood2Panels`
 - `bands.py` — StraightBandPanel, StraightWB, FittedWB, CuffBand, CuffSkirt, CuffBandSkirt
 - `skirt_paneled.py` — SkirtPanel, ThinSkirtPanel, FittedSkirtPanel, PencilSkirt, Skirt2, SkirtManyPanels
 - `circle_skirt.py` — CircleArcPanel, AsymHalfCirclePanel, SkirtCircle, AsymmSkirtCircle
