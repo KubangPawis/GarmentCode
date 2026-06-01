@@ -181,3 +181,28 @@ Keyed on the priority that actually drives the choice:
 The recommendation carries an explicit conditional trigger, because corpus mix is the deciding variable and we do not yet know it. *If* the corpus turns out to be overwhelmingly staples (low ❌-axis incidence), collapse to **GarmentCode-only** — the triage overhead buys nothing. *If* it is largely couture (high ❌-axis incidence), GarmentCode earns its place only as an optional editability layer fitted on top of reconstructed meshes, with reconstruction as the primary backend. Since the mix is currently unknown, the immediate next step is a **corpus audit**: score a representative sample of the corpus against the seven §4 axes and read off the ❌-axis incidence. That single measurement decides whether to collapse the hybrid toward GarmentCode-only or toward reconstruction-primary — and it should be run before committing engineering to either extreme.
 
 ## §8 Appendix
+
+**Library inventory — the full garment-program vocabulary.** This is the complete set of classes the forward generator can compose; everything in §3 and §4 is judged against it. Classes per garment-program file (verified at commit `db94b2c`):
+
+- `tee.py` — TorsoFrontHalfPanel, TorsoBackHalfPanel
+- `bodice.py` — BodiceFrontHalf, BodiceBackHalf, BodiceHalf, Shirt, FittedShirt
+- `sleeves.py` — SleevePanel, Sleeve
+- `collars.py` — VNeckHalf, SquareNeckHalf, NoPanelsCollar, Turtle, SimpleLapel(Panel), Hood(Panel/Hood2Panels)
+- `bands.py` — StraightBandPanel, StraightWB, FittedWB, CuffBand, CuffSkirt, CuffBandSkirt
+- `skirt_paneled.py` — SkirtPanel, ThinSkirtPanel, FittedSkirtPanel, PencilSkirt, Skirt2, SkirtManyPanels
+- `circle_skirt.py` — CircleArcPanel, AsymHalfCirclePanel, SkirtCircle, AsymmSkirtCircle
+- `skirt_levels.py` — SkirtLevels
+- `godet.py` — Insert, GodetSkirt
+- `pants.py` — PantPanel, PantsHalf, Pants
+- `meta_garment.py` — MetaGarment (upper + bottom + wb composer)
+- `base_classes.py` — BaseBodicePanel, BaseBottoms, StackableSkirtComponent, BaseBand
+
+Note what the inventory does *not* contain: no keyhole/slit collar, no stacked-flounce ruffle component, no combined asymmetric-tiered-cascade skirt, no tied/knotted sash, and no appearance/print primitive. Those absences are the ❌ rows of §3.
+
+**Entry points.** `gui.py` (interactive design GUI), `test_garmentcode.py` and `test_garment_sim.py` (pattern and sim smoke tests), `pattern_sampler.py` (parameter-space sampling), `pattern_data_sim.py` (dataset draping/simulation).
+
+**References.**
+- GarmentCode — SIGGRAPH Asia 2023, ACM TOG 42(6), doi 10.1145/3618351.
+- GarmentCodeData — ECCV 2024.
+- Repository — `github.com/maria-korosteleva/GarmentCode`.
+- Cloth-sim fork — `NvidiaWarp-GarmentCode`.
