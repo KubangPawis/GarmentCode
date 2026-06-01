@@ -161,4 +161,23 @@ The honest framing: this is a **library R&D track**, sized by the feature divers
 
 ## §7 Alternatives & decision framework
 
+The real decision axis is **fidelity-to-the-original versus editability/sewability/parametric control**. The two pull against each other, and which one dominates depends on the corpus. Four options sit along that axis:
+
+1. **GarmentCode-only** — output is clean, editable, and sewable, but fidelity is hard-capped at the library's vocabulary. Best for staples, useless as a faithful twin for couture (§3, §6).
+2. **Neural garment/cloth reconstruction** (multi-view → surface) — high fidelity to arbitrary garments including all the ❌ features, but the output is a messy surface mesh: non-editable, non-sewable, no parametric handles.
+3. **Hybrid / triage** — classify each garment by complexity, route staples to GarmentCode (editable) and couture-class items to reconstruction (faithful), and optionally fit GarmentCode parameters to a reconstructed mesh where editability is worth the loss in fidelity.
+4. **Photogrammetry + sewability post-process** — capture faithfully, then infer seams as a separate downstream step; heavy and largely orthogonal, a separate track rather than a drop-in backend.
+
+Keyed on the priority that actually drives the choice:
+
+| Priority | Best fit |
+|---|---|
+| Editability / sewability / parametric control | GarmentCode |
+| Fidelity to an arbitrary intricate original | Neural reconstruction |
+| Both, across a mixed corpus | Hybrid triage |
+
+**Recommendation: adopt hybrid triage.** Use GarmentCode only for the supported staple subset — garments whose defining features all sit on ✅/tunable-🟡 axes (§4) — and re-skin those with the scanned texture for look. Route every couture-class item, meaning any garment that fails a ❌ axis, to neural reconstruction for a faithful twin. This is the only option that honors both halves of the decision axis instead of sacrificing one.
+
+The recommendation carries an explicit conditional trigger, because corpus mix is the deciding variable and we do not yet know it. *If* the corpus turns out to be overwhelmingly staples (low ❌-axis incidence), collapse to **GarmentCode-only** — the triage overhead buys nothing. *If* it is largely couture (high ❌-axis incidence), GarmentCode earns its place only as an optional editability layer fitted on top of reconstructed meshes, with reconstruction as the primary backend. Since the mix is currently unknown, the immediate next step is a **corpus audit**: score a representative sample of the corpus against the seven §4 axes and read off the ❌-axis incidence. That single measurement decides whether to collapse the hybrid toward GarmentCode-only or toward reconstruction-primary — and it should be run before committing engineering to either extreme.
+
 ## §8 Appendix
