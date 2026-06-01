@@ -1,0 +1,210 @@
+# Can GarmentCode Genuinely Recreate a Designer Fashion Garment?
+*Internal engineering decision memo*
+
+- **Date:** 2026-06-01
+- **Assessed:** GarmentCode @ commit `db94b2c`, `pygarment` v2.0.2
+- **Case study:** DVF floral chiffon tiered-ruffle maxi dress (`DVF_3008_R1`)
+- **Decision:** Whether to adopt GarmentCode as the garment-reconstruction backend for an image-scan → 3D-garment pipeline.
+- **Confidence:** High on categorical-gap claims (verified against library source); Medium on effort estimates.
+
+## §0 Executive verdict
+
+**No — GarmentCode cannot genuinely recreate this class of garment.** Pointed at the DVF floral chiffon tiered-ruffle maxi dress, the best it can produce is a *simplified, editable, sewable parametric cousin*: a long-sleeve, fitted-bodice, flared/tiered maxi with a flat waistband and ruffled cuffs that shares the silhouette family — and nothing more. The traits that make the dress *that dress* (the sheer-over-slip layering, the cascading tiered ruffles, the tied sash, the print and lurex shimmer) are absent from the output, not merely approximated.
+
+This is a structural limit, not a tuning problem. GarmentCode is a forward parametric generator that draws from a fixed, largely symmetric, single-layer garment-program library and carries no fabric-appearance model. The dress's defining traits therefore land as *categorical gaps* — there is no design vocabulary to map them onto — rather than out-of-range parameters that more careful tuning could reach.
+
+**Recommendation:** Do **not** adopt GarmentCode as a fidelity-preserving reconstruction backend for couture-class items. Use it only where the deliverable is a clean, editable parametric stand-in re-skinned with the scanned texture; route faithful digital twins to a neural garment/cloth reconstruction path; and prefer a **hybrid triage** that routes by garment complexity (full argument in §7).
+
+The most damning, defining traits — each a categorical gap:
+
+| Defining trait of the dress | GarmentCode |
+|---|---|
+| Two-layer sheer overlay over opaque slip | ❌ |
+| Multi-tier cascading ruffle sleeves & hem | ❌ |
+| Tied sash bow with hanging tails | ❌ |
+| Floral print + lurex shimmer + sheer chiffon | ❌ |
+| Keyhole / plunging slit neckline | ❌ |
+
+*❌ = categorical gap: no design vocabulary to express this (full legend and per-feature analysis in §3).*
+
+## §1 Context & scope
+
+We assessed GarmentCode at commit `db94b2c` against the published `pygarment` v2.0.2 library. The concrete test case is the DVF floral chiffon tiered-ruffle maxi dress catalogued as `DVF_3008_R1`. We picked it deliberately: it is a representative designer/couture item, not a staple, and it exercises nearly every dimension where a parametric pattern generator can fail.
+
+Its construction, annotated: a printed sheer chiffon shell shot through with lurex thread; a round neck broken by a deep keyhole/plunging slit (the round neckline itself maps cleanly to GarmentCode, but the keyhole cutout breaking it does not — see §3); long bell sleeves finished with stacked ruffle flounces rather than a single cuff; a fitted bodice joined to the skirt at a waist seam; a tied sash bow with hanging tails at the waist; and an asymmetric high-low, tiered, cascading ruffle skirt that reads as a *sheer overlay* draped over a separate opaque yellow slip. The garment's identity lives in the combination of these features, not in any one of them.
+
+The fidelity bar for this memo is deliberately strict. "Genuinely recreate" means **visual and constructional fidelity sufficient to stand in as a digital twin** of *this* garment — the layering, the ruffle cascade, the tie, the print all present and correct. It does **not** mean "produces something that evokes the same silhouette family." A long-sleeve fitted maxi that omits the layering, the cascade, the tie, and the print is a different garment that happens to share an outline; under our bar that is a failure, not a near-miss.
+
+## §2 How GarmentCode works — the constraint that matters
+
+GarmentCode is a **forward, procedural generator**: the data flow is strictly `parameters → garment`. Its inputs are a YAML file of design parameters plus a YAML file of body measurements (scalars such as bust, waist, height). Its output is a 2D **sewing-pattern specification** as JSON, rendered to SVG/PNG/PDF through `pattern/wrappers.py`. There is no 3D mesh in the core pipeline; a mesh exists *only* if you additionally run the optional NVIDIA Warp cloth simulation under `meshgen/`, which drapes the flat pattern onto a body. Nothing in this path runs backward — there is no `image → parameters` inference (see §5).
+
+The design space is not open-ended. It is a **fixed library of garment programs** that are composed by a single top-level class, `MetaGarment` (`assets/garment_programs/meta_garment.py`). `MetaGarment` assembles exactly one `upper` (bodice/shirt/tee), one `bottom` (skirt or pants), and one `wb` (waistband/belt). That is the entire topology: one upper, one bottom, one band. By construction this is **single-layer** — there is no slot for a second, independently-draped garment such as a sheer overlay over a slip. Whatever a garment "is," it must be expressible as one upper plus one bottom plus one band drawn from the library's named classes.
+
+There is also **no appearance model**. Print, sheer, and lurex are not pattern concepts anywhere in the generator — the pattern knows panels, seams, and interfaces, not what the fabric looks like. Appearance is handled entirely out-of-band as a rendering step: texture is projected onto the mesh's UVs via `texture_utils` and pyrender, after the pattern already exists.
+
+The point to carry forward: the library of garment programs plus the `MetaGarment` one-upper/one-bottom/one-band topology *is* the expressivity ceiling. Everything the rest of this memo concludes follows from reading the garment against that ceiling — if a feature has no class in the library and no place in that topology, no amount of parameter tuning produces it.
+
+## §3 Case study — the DVF dress teardown
+
+This is the centerpiece. We decompose the dress feature by feature and judge each against the library, using a three-symbol legend that the rest of the memo reuses unchanged.
+
+> Legend: ✅ supported · 🟡 out-of-range (param/range gap, extendable by tuning) · ❌ categorical gap (no vocabulary; needs new code or impossible).
+
+| Feature in the image | Verdict | Closest library capability |
+|---|---|---|
+| Maxi A-line / full skirt silhouette | ✅ | `circle_skirt.SkirtCircle`, `skirt_paneled.SkirtManyPanels` |
+| Fitted bodice + waist seam | ✅ | `bodice.FittedShirt` / `bodice.BodiceHalf` |
+| Long sleeves | ✅ | `sleeves.Sleeve` |
+| Round neckline | ✅ | `collars` — `CircleNeckHalf` / `CircleArcNeckHalf` |
+| Tiered (stacked-level) skirt | ✅ | `skirt_levels.SkirtLevels` |
+| Asymmetric high-low hem | 🟡 | `circle_skirt.AsymmSkirtCircle` — exists, but separately from tiers |
+| Single flared / ruffled cuff | 🟡 | `sleeves` `connect_ruffle` + `cuff` (one ruffle, `CuffBand`/`CuffSkirt`) |
+| Flat waist-band piece | 🟡 | `bands.StraightWB` / `FittedWB` (a band, not a tie) |
+| Multi-tier cascading ruffle sleeves (2–3 stacked flounces) | ❌ | none |
+| Cascading diagonal ruffle-wrap overlay on skirt | ❌ | none |
+| Asymmetric AND tiered AND cascading simultaneously | ❌ | no such composition |
+| Tied sash bow with hanging tails | ❌ | a knotted bow is a draped/posed result, not a pattern |
+| Keyhole / plunging slit neckline | ❌ | neckline functions only shape the open neckline contour; a keyhole is a closed-top interior cutout, which none can express |
+| Two-layer sheer overlay over opaque slip | ❌ | single-layer; `MetaGarment` = one upper + one bottom + one belt |
+| Floral print + lurex shimmer + sheer chiffon look | ❌ | not a pattern concept; texture/material/render only |
+| Soft fluttering chiffon drape | 🟡 | sim material setting; chiffon flutter is hard for cloth sim generally |
+
+Read top to bottom, the matrix splits cleanly. The ✅ rows are the garment's *generic* properties — it is long-sleeved, fitted at the bodice, full and tiered in the skirt, round at the neck. These are exactly the staples the library was built around, so each maps onto a named class (`Sleeve`, `FittedShirt`/`BodiceHalf`, `SkirtLevels`, the `collars` set — which covers turtle, hood, and lapel collars plus round/circle-arc, V-neck, square, trapezoid, curvy, and Bézier neckline shapes). The 🟡 rows are features the library *gestures at* but cannot reach in the configuration the dress needs: `AsymmSkirtCircle` gives asymmetry and `SkirtLevels` gives tiers, but they are separate classes that do not compose; `connect_ruffle` plus a cuff gives *one* ruffle, not a stack; `StraightWB`/`FittedWB` give a flat band where the dress has a knotted sash. These are reachable in principle by writing more code (§6), not by tuning an existing parameter.
+
+The ❌ rows cluster into six themes, and each is a *vocabulary* gap — there is simply nothing in the design language to map the feature onto, so the question "what parameter value produces it?" has no answer:
+
+- **Structural asymmetry combined with tiering and cascade.** The library has asymmetry (`AsymmSkirtCircle`) and tiering (`SkirtLevels`) as disjoint classes; the dress needs them fused with a diagonal cascade, and there is no composite class that expresses all three at once.
+- **True layering.** `MetaGarment`'s one-upper/one-bottom/one-band topology has no slot for a second, independently-draped garment, so a sheer overlay registered over an opaque slip cannot be represented at all.
+- **Cascade ruffles.** Sleeve ruffling is a single `connect_ruffle`/cuff event and skirt levels stack vertically; neither produces the stacked-flounce cascade on the sleeves nor the diagonal ruffle-wrap on the skirt.
+- **Draped ties.** A tied sash bow with hanging tails is a posed/draped result of manipulating fabric, not a flat pattern piece; `bands` only emits flat straight or fitted bands.
+- **Complex necklines.** `collars.py` offers a fairly rich set — turtle, hood, and lapel collars plus round/circle-arc, V-neck, square, trapezoid, curvy, and Bézier neckline shapes — but every one of these functions only shapes the *open neckline contour* cut from the top edge of the bodice. A keyhole or plunging slit is a *closed-top interior cutout*: the neckline closes around the neck, then opens below. None of the contour functions or collar components can express that closed-top opening.
+- **Appearance.** Floral print, lurex shimmer, and sheer chiffon are not pattern concepts anywhere; the generator has no place to record them.
+
+The punchline is uncomfortable and decisive: the ❌ rows are precisely the features that make this dress visually distinctive. The ✅ rows describe a generic long-sleeve tiered maxi that a hundred other garments also satisfy. So when GarmentCode runs, the *silhouette family* survives — and the garment's *identity* does not.
+
+## §4 Generalized taxonomy — scaling to the corpus
+
+The dress teardown generalizes. Rather than re-running a full analysis for every corpus item, we lift the findings into seven reusable **feature axes**. For each axis, GarmentCode occupies a position on a ✅/🟡/❌ scale (same legend as §3), and any new garment can be scored axis by axis. The axes:
+
+| Axis | ✅ Supported | 🟡 Out-of-range | ❌ Categorical gap |
+|---|---|---|---|
+| Symmetry | symmetric panels | mild asymmetry | structural asymmetry |
+| Layering | single layer | lining as a 2nd separate garment (2 runs, no registration) | integrated sheer-over-slip |
+| Ruffles / gathers | single edge ruffle (`ruffle` interface param) | one cuff or one skirt level | multi-tier cascade |
+| Closures & ties | seam / dart | flat band (`StraightWB`) | tied knot / bow / draped tie |
+| Necklines / collars | turtle, hood, lapel + round/circle-arc, V, square, trapezoid, curvy, Bézier necklines | minor variants | keyhole / slit (closed-top interior cutout) / sculpted |
+| Appearance | solid color (render-side) | — | any print, sheer, metallic |
+| Drape / fabric | stable wovens | soft fabrics | chiffon flutter, fine gathers |
+
+Each row names a real construction concern. The first asks whether the garment's panels mirror left-to-right; GarmentCode is built around symmetric panels and only mildly tolerant of off-center construction, with no representation for a structurally one-sided cut. The second asks whether the garment is one shell or several interacting layers; the generator is single-layer, and the most it can do is run twice for an unregistered lining, never an integrated sheer-over-slip. The third distinguishes a single gathered edge (the `ruffle` interface param) from one localized gather (a cuff or one skirt level) from a stacked cascade, which has no class. The fourth separates structural seams and darts from flat bands (`StraightWB`) from draped knots and bows, which are posed artifacts rather than pattern pieces. The fifth is bounded by the fixed `collars` set, whose functions only shape the open neckline contour cut from the bodice's top edge, so anything sculpted or any closed-top interior cutout like a keyhole/slit falls outside what it can express. The sixth is render-side only — solid color survives, but any print, sheer, or metallic finish is not a pattern concept at all. The seventh captures how forgiving the cloth sim is: stable wovens behave, soft fabrics are harder, and fine chiffon flutter is at the edge of what cloth sim does well in general.
+
+This gives a one-line decision rule:
+
+> **If a garment's identity rests on any ❌ axis, GarmentCode reproduces its silhouette but not its identity.**
+
+To apply the table to a new corpus item, score it once on each of the seven axes — symmetric or not, single-layer or layered, which ruffle/tie/neckline/appearance/drape class it needs — then ask where its *defining* features sit. If everything that matters is ✅ (and at worst 🟡, closeable by tuning or modest extension), GarmentCode is a reasonable backend for that item. The moment a feature the garment is known *for* lands on ❌, the heuristic fires: the output will share an outline and lose the thing that made the garment worth scanning.
+
+## §5 The bridging problem (image → parameters)
+
+The proposed pipeline's most upstream input is a multi-view image scan of a real garment, but GarmentCode runs only forward (`parameters → garment`, §2). To use it as a reconstruction backend we would need the **inverse** step: `images → design + body parameters`. That inverse model is **not in the repository**. The closest thing, `pattern_fitter.py`, does something narrower — it refits an *already-chosen* design to a different set of body measurements. It assumes the design is already known; it does not infer the design from a picture.
+
+It is tempting to assume a strong enough inverse model would close the gaps. It cannot, and the reason is structural. Any inverse model — even a hypothetically *perfect* one — can only emit parameters that the forward model accepts, and the forward model's vocabulary is exactly the library inventoried in §3 and §8. So when the scanned garment carries a ❌ feature (a tied sash, a sheer overlay, a cascade ruffle), there is no parameter to set; the inverse model's loss is minimized by snapping the feature to the nearest *supported* staple. The ❌ features are therefore **silently collapsed**, not flagged. Bridging does not raise the expressivity ceiling — it just lets the pipeline reach it from images instead of hand-authored YAML.
+
+```
+   multi-view images
+          │
+          ▼
+   ┌─────────────────────┐
+   │  INVERSE MODEL       │   ← NOT in repo (pattern_fitter.py
+   │  images → params     │     only refits a known design to body sizes)
+   └─────────────────────┘
+          │
+          │  can only emit params the forward model accepts
+          ▼
+   ❌ features collapse to nearest supported staple HERE
+          │
+          ▼
+   ┌─────────────────────┐
+   │  FORWARD GENERATOR   │   ← GarmentCode library + MetaGarment
+   │  params → pattern    │
+   └─────────────────────┘
+          │
+          ▼
+   2D pattern → (optional Warp sim) → 3D mesh
+          │
+          ▼
+   appearance bridged SEPARATELY: scanned texture → UVs
+   (recovers look, not construction)
+```
+
+This framing also clarifies what GarmentCodeData is for. Its stated purpose is garment reconstruction, and the dataset exists precisely to *train* inverse models of this kind. That is genuinely useful — but only for the **supported subset**, the garments whose defining features all sit on ✅ (and at worst tunable 🟡) axes. For the couture subset it trains a model to collapse the very features that mattered.
+
+Finally, appearance is bridged on a completely separate track: the scanned texture is projected onto the mesh's UVs (§2). This recovers how the garment *looks* — the print, the color — but it changes nothing about *construction*. A sheer overlay painted as a texture onto a single opaque layer still has one layer; the layering, the cascade, and the tie remain absent underneath the picture.
+
+## §6 Cost of closing the gaps
+
+Some of the gaps are closeable, and it is worth being precise about which. Extending the garment-program library is a real, well-defined lever: GarmentCode's library is a set of `Component`/`Panel` classes, and new ones can be written. A keyhole collar class, a stacked-flounce ruffle component, an asymmetric-tiered cascade skirt — each is buildable in principle. But the work is **per-construction-type engineering**, not a config change. Every new class means designing the panel geometry, defining its interfaces, wiring its stitching, attaching its sim labels, and validating that it drapes correctly. There is no parameter that turns these on; someone writes and tests each one.
+
+Some gaps cannot be closed by library work at all, ever. Fabric print, sheer, and lurex are appearance, not pattern — they live in the render/texture stage and no panel class will ever produce them (and texture projection, §5, recovers look but not construction). True integrated multi-layer interaction — a sheer overlay that drapes *against* an opaque slip with correct registration — exceeds the single-layer `MetaGarment` topology and would need a layering model with drape registration, not just one more class. A physically tied knot or bow is a posing/simulation artifact of manipulating fabric; it is not a flat pattern piece and cannot be emitted by the generator.
+
+The rough effort shape, by gap **(Medium confidence)** — T-shirt sizes, where S/M/L is per-feature design + panel geometry + interfaces + stitching + sim labels + validation:
+
+| Gap | Closeable by library work? | Rough effort |
+|---|---|---|
+| Keyhole / slit necklines | Yes — new collar class | S |
+| Multi-tier cascading ruffles (sleeve & hem) | Yes — new ruffle/flounce component | M |
+| Asymmetric + tiered + cascading skirt | Yes — new composite skirt class | M–L |
+| Integrated two-layer sheer-over-slip | Partly — needs layering model + drape registration | L |
+| Tied sash bow with tails | No (pattern); sim/pose only | — |
+| Print / sheer / lurex appearance | No (out-of-band texture/render) | — |
+
+The honest framing: this is a **library R&D track**, sized by the feature diversity of the corpus rather than a single fixed cost, and even fully funded it cannot reach the "No" rows — the tied sash and the print/sheer/lurex appearance — which are among the dress's defining traits. Closing every closeable gap still leaves the garment short of a faithful twin.
+
+## §7 Alternatives & decision framework
+
+The real decision axis is **fidelity-to-the-original versus editability/sewability/parametric control**. The two pull against each other, and which one dominates depends on the corpus. Four options sit along that axis:
+
+1. **GarmentCode-only** — output is clean, editable, and sewable, but fidelity is hard-capped at the library's vocabulary. Best for staples, useless as a faithful twin for couture (§3, §6).
+2. **Neural garment/cloth reconstruction** (multi-view → surface) — high fidelity to arbitrary garments including all the ❌ features, but the output is a messy surface mesh: non-editable, non-sewable, no parametric handles.
+3. **Hybrid / triage** — classify each garment by complexity, route staples to GarmentCode (editable) and couture-class items to reconstruction (faithful), and optionally fit GarmentCode parameters to a reconstructed mesh where editability is worth the loss in fidelity.
+4. **Photogrammetry + sewability post-process** — capture faithfully, then infer seams as a separate downstream step; heavy and largely orthogonal, a separate track rather than a drop-in backend.
+
+Keyed on the priority that actually drives the choice:
+
+| Priority | Best fit |
+|---|---|
+| Editability / sewability / parametric control | GarmentCode |
+| Fidelity to an arbitrary intricate original | Neural reconstruction |
+| Both, across a mixed corpus | Hybrid triage |
+
+**Recommendation: adopt hybrid triage.** Use GarmentCode only for the supported staple subset — garments whose defining features all sit on ✅/tunable-🟡 axes (§4) — and re-skin those with the scanned texture for look. Route every couture-class item, meaning any garment that fails a ❌ axis, to neural reconstruction for a faithful twin. This is the only option that honors both halves of the decision axis instead of sacrificing one.
+
+The recommendation carries an explicit conditional trigger, because corpus mix is the deciding variable and we do not yet know it. *If* the corpus turns out to be overwhelmingly staples (low ❌-axis incidence), collapse to **GarmentCode-only** — the triage overhead buys nothing. *If* it is largely couture (high ❌-axis incidence), GarmentCode earns its place only as an optional editability layer fitted on top of reconstructed meshes, with reconstruction as the primary backend. Since the mix is currently unknown, the immediate next step is a **corpus audit**: score a representative sample of the corpus against the seven §4 axes and read off the ❌-axis incidence. That single measurement decides whether to collapse the hybrid toward GarmentCode-only or toward reconstruction-primary — and it should be run before committing engineering to either extreme.
+
+## §8 Appendix
+
+**Library inventory — the full garment-program vocabulary.** This is the complete set of classes the forward generator can compose; everything in §3 and §4 is judged against it. Classes per garment-program file (verified at commit `db94b2c`):
+
+- `tee.py` — TorsoFrontHalfPanel, TorsoBackHalfPanel
+- `bodice.py` — BodiceFrontHalf, BodiceBackHalf, BodiceHalf, Shirt, FittedShirt
+- `sleeves.py` — SleevePanel, Sleeve
+- `collars.py` — neckline shape functions `VNeckHalf, SquareNeckHalf, TrapezoidNeckHalf, CurvyNeckHalf, CircleArcNeckHalf, CircleNeckHalf, Bezier2NeckHalf`; collar components `NoPanelsCollar, Turtle, SimpleLapelPanel/SimpleLapel, HoodPanel/Hood2Panels`
+- `bands.py` — StraightBandPanel, StraightWB, FittedWB, CuffBand, CuffSkirt, CuffBandSkirt
+- `skirt_paneled.py` — SkirtPanel, ThinSkirtPanel, FittedSkirtPanel, PencilSkirt, Skirt2, SkirtManyPanels
+- `circle_skirt.py` — CircleArcPanel, AsymHalfCirclePanel, SkirtCircle, AsymmSkirtCircle
+- `skirt_levels.py` — SkirtLevels
+- `godet.py` — Insert, GodetSkirt
+- `pants.py` — PantPanel, PantsHalf, Pants
+- `meta_garment.py` — MetaGarment (upper + bottom + wb composer)
+- `base_classes.py` — BaseBodicePanel, BaseBottoms, StackableSkirtComponent, BaseBand
+
+Note what the inventory does *not* contain: no keyhole/slit collar, no stacked-flounce ruffle component, no combined asymmetric-tiered-cascade skirt, no tied/knotted sash, and no appearance/print primitive. Those absences are the ❌ rows of §3.
+
+**Entry points.** `gui.py` (interactive design GUI), `test_garmentcode.py` and `test_garment_sim.py` (pattern and sim smoke tests), `pattern_sampler.py` (parameter-space sampling), `pattern_data_sim.py` (dataset draping/simulation).
+
+**References.**
+- GarmentCode — SIGGRAPH Asia 2023, ACM TOG 42(6), doi 10.1145/3618351.
+- GarmentCodeData — ECCV 2024.
+- Repository — `github.com/maria-korosteleva/GarmentCode`.
+- Cloth-sim fork — `NvidiaWarp-GarmentCode`.
