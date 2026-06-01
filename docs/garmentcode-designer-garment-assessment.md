@@ -83,6 +83,26 @@ The punchline is uncomfortable and decisive: the ❌ rows are precisely the feat
 
 ## §4 Generalized taxonomy — scaling to the corpus
 
+The dress teardown generalizes. Rather than re-running a full analysis for every corpus item, we lift the findings into seven reusable **feature axes**. For each axis, GarmentCode occupies a position on a ✅/🟡/❌ scale (same legend as §3), and any new garment can be scored axis by axis. The axes:
+
+| Axis | ✅ Supported | 🟡 Out-of-range | ❌ Categorical gap |
+|---|---|---|---|
+| Symmetry | symmetric panels | mild asymmetry | structural asymmetry |
+| Layering | single layer | lining as a 2nd separate garment (2 runs, no registration) | integrated sheer-over-slip |
+| Ruffles / gathers | single edge ruffle (`ruffle` interface param) | one cuff or one skirt level | multi-tier cascade |
+| Closures & ties | seam / dart | flat band (`StraightWB`) | tied knot / bow / draped tie |
+| Necklines / collars | V / square / turtle / lapel / hood | minor variants | keyhole / slit / sculpted |
+| Appearance | solid color (render-side) | — | any print, sheer, metallic |
+| Drape / fabric | stable wovens | soft fabrics | chiffon flutter, fine gathers |
+
+Each row names a real construction concern. The first asks whether the garment's panels mirror left-to-right; GarmentCode is built around symmetric panels and only mildly tolerant of off-center construction, with no representation for a structurally one-sided cut. The second asks whether the garment is one shell or several interacting layers; the generator is single-layer, and the most it can do is run twice for an unregistered lining, never an integrated sheer-over-slip. The third distinguishes a single gathered edge (the `ruffle` interface param) from one localized gather (a cuff or one skirt level) from a stacked cascade, which has no class. The fourth separates structural seams and darts from flat bands (`StraightWB`) from draped knots and bows, which are posed artifacts rather than pattern pieces. The fifth is bounded by the fixed `collars` set, so anything sculpted or slit falls off the end. The sixth is render-side only — solid color survives, but any print, sheer, or metallic finish is not a pattern concept at all. The seventh captures how forgiving the cloth sim is: stable wovens behave, soft fabrics are harder, and fine chiffon flutter is at the edge of what cloth sim does well in general.
+
+This gives a one-line decision rule:
+
+> **If a garment's identity rests on any ❌ axis, GarmentCode reproduces its silhouette but not its identity.**
+
+To apply the table to a new corpus item, score it once on each of the seven axes — symmetric or not, single-layer or layered, which ruffle/tie/neckline/appearance/drape class it needs — then ask where its *defining* features sit. If everything that matters is ✅ (and at worst 🟡, closeable by tuning or modest extension), GarmentCode is a reasonable backend for that item. The moment a feature the garment is known *for* lands on ❌, the heuristic fires: the output will share an outline and lose the thing that made the garment worth scanning.
+
 ## §5 The bridging problem (image → parameters)
 
 ## §6 Cost of closing the gaps
