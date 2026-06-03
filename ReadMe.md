@@ -27,11 +27,13 @@ Official Implementation of [GarmentCode: Programming Parametric Sewing Patterns]
 ## Documents
 
 1. [Installation](https://github.com/maria-korosteleva/GarmentCode/blob/main/docs/Installation.md)
-2. [Running Configurator](https://github.com/maria-korosteleva/GarmentCode/blob/main/docs/Running_garmentcode.md) 
-3. [Running Data Generation (warp)](https://github.com/maria-korosteleva/GarmentCode/blob/main/docs/Running_data_generation.md) 
-3. [Body measurements](https://github.com/maria-korosteleva/GarmentCode/blob/main/docs/Body%20Measurements%20GarmentCode.pdf)
-4. [Dataset documentation](https://www.research-collection.ethz.ch/handle/20.500.11850/673889)
-3. [Running Old Maya+Qualoth tools](https://github.com/maria-korosteleva/GarmentCode/blob/main/docs/Running_Maya_Qualoth.md) 
+2. [Using GarmentCode on Windows/Linux](https://github.com/maria-korosteleva/GarmentCode/blob/main/docs/Using_GarmentCode_Windows_Linux.md)
+3. [Using GarmentCode on macOS](https://github.com/maria-korosteleva/GarmentCode/blob/main/docs/Using_GarmentCode_macOS.md)
+4. [Running Configurator](https://github.com/maria-korosteleva/GarmentCode/blob/main/docs/Running_garmentcode.md)
+5. [Running Data Generation (warp)](https://github.com/maria-korosteleva/GarmentCode/blob/main/docs/Running_data_generation.md)
+6. [Body measurements](https://github.com/maria-korosteleva/GarmentCode/blob/main/docs/Body%20Measurements%20GarmentCode.pdf)
+7. [Dataset documentation](https://www.research-collection.ethz.ch/handle/20.500.11850/673889)
+8. [Running Old Maya+Qualoth tools](https://github.com/maria-korosteleva/GarmentCode/blob/main/docs/Running_Maya_Qualoth.md)
 
 ## Navigation
 
