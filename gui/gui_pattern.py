@@ -13,11 +13,15 @@ from assets.garment_programs.meta_garment import MetaGarment
 from assets.bodies.body_params import BodyParameters
 import pygarment as pyg
 from pygarment.meshgen.boxmeshgen import BoxMesh
-from pygarment.meshgen.simulation import run_sim
 import pygarment.data_config as data_config
 from pygarment.meshgen.sim_config import PathCofig
 
 verbose = False
+
+
+class MissingWarpError(RuntimeError):
+    """Raised when a simulation-only workflow is used without Warp installed."""
+    pass
 
 def _id_generator(size=10, chars=string.ascii_uppercase + string.digits):
         """Generate a random string of a given size, see
@@ -198,6 +202,14 @@ class GUIPattern:
     # 3D
     def drape_3d(self):
         """Run the draping of the current frame"""
+        try:
+            from pygarment.meshgen.simulation import run_sim
+        except ModuleNotFoundError as e:
+            if e.name == 'warp':
+                raise MissingWarpError(
+                    'Warp simulator is not installed. Install NvidiaWarp-GarmentCode to use the 3D drape view.'
+                ) from e
+            raise
 
         # Config setup 
         props = data_config.Properties('./assets/Sim_props/gui_sim_props.yaml')   # TODOLOW Parameter?
@@ -352,4 +364,3 @@ class GUIPattern:
         print(f'Success! {self.sew_pattern.name} saved to {self.saved_garment_folder}')
 
         return self.saved_garment_archive if pack else self.saved_garment_folder
-

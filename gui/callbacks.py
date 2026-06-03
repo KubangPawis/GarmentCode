@@ -18,7 +18,7 @@ from concurrent.futures import ThreadPoolExecutor
 import asyncio
 
 # Custom
-from .gui_pattern import GUIPattern
+from .gui_pattern import GUIPattern, MissingWarpError
 
 
 icon_github = """
@@ -691,6 +691,16 @@ class GUIState:
             # Show the result! =)
             self.spin_dialog.close()
 
+        except MissingWarpError as e:
+            print(e)
+            self.ui_3d_scene.set_visibility(True)
+            self.spin_dialog.close()  # If open
+            ui.notify(
+                str(e),
+                type='warning',
+                close_button=True,
+                position='center'
+            )
         except KeyboardInterrupt as e:
             raise e
         except BaseException as e:
