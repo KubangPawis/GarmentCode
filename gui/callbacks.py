@@ -148,13 +148,13 @@ class GUIState:
                 on_click=lambda: ui.navigate.to('https://igl.ethz.ch/projects/garmentcode/', new_tab=True)
                 ).props('flat color=white')
             with ui.link(target='https://arxiv.org/abs/2306.03642', new_tab=True):
-                ui.html(icon_arxiv).classes('w-16 bg-transparent')
+                ui.html(icon_arxiv, sanitize=False).classes('w-16 bg-transparent')
             ui.button(
                 'Dataset', 
                 on_click=lambda: ui.navigate.to('https://igl.ethz.ch/projects/GarmentCodeData/', new_tab=True)
                 ).props('flat color=white')
             with ui.link(target='https://github.com/maria-korosteleva/GarmentCode', new_tab=True):
-                ui.html(icon_github).classes('w-8 bg-transparent')
+                ui.html(icon_github, sanitize=False).classes('w-8 bg-transparent')
         # NOTE No ui.left_drawer(), no ui.right_drawer()
         with ui.footer(fixed=False, elevated=True).classes('items-center justify-center p-0 m-0'): 
             # https://www.termsfeed.com/blog/sample-copyright-notices/
