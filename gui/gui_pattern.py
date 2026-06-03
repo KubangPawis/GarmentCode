@@ -250,6 +250,7 @@ class GUIPattern:
             save_v_norms=False,
             store_usd=False,  # NOTE: False for fast simulation!, 
             optimize_storage=False,
+            render=False,
             verbose=False
         )
 
