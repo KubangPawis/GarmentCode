@@ -1,4 +1,5 @@
 from pathlib import Path
+import platform
 import time
 import yaml
 import shutil 
@@ -20,8 +21,19 @@ verbose = False
 
 
 class MissingWarpError(RuntimeError):
-    """Raised when a simulation-only workflow is used without Warp installed."""
+    """Raised when a simulation-only workflow cannot use the local Warp runtime."""
     pass
+
+
+def _check_warp_runtime_supported():
+    import warp as wp
+
+    if platform.system() == 'Darwin' and not wp.get_device().is_cuda:
+        raise MissingWarpError(
+            '3D drape is not available with this macOS CPU-only Warp build. '
+            'Use the 2D pattern tools locally, or run 3D drape on a CUDA-enabled Linux/Windows setup.'
+        )
+
 
 def _id_generator(size=10, chars=string.ascii_uppercase + string.digits):
         """Generate a random string of a given size, see
@@ -210,6 +222,7 @@ class GUIPattern:
                     'Warp simulator is not installed. Install NvidiaWarp-GarmentCode to use the 3D drape view.'
                 ) from e
             raise
+        _check_warp_runtime_supported()
 
         # Config setup 
         props = data_config.Properties('./assets/Sim_props/gui_sim_props.yaml')   # TODOLOW Parameter?

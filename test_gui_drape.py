@@ -55,5 +55,27 @@ class GuiDrapeTest(unittest.TestCase):
         _, kwargs = fake_run_sim.call_args
         self.assertIs(kwargs["render"], False)
 
+    def test_drape_3d_reports_macos_cpu_warp_before_native_simulation(self):
+        import gui.gui_pattern as gui_pattern
+
+        fake_run_sim = Mock()
+        fake_simulation = types.ModuleType("pygarment.meshgen.simulation")
+        fake_simulation.run_sim = fake_run_sim
+        fake_warp = types.ModuleType("warp")
+        fake_warp.get_device = Mock(return_value=types.SimpleNamespace(is_cuda=False))
+
+        pattern = gui_pattern.GUIPattern.__new__(gui_pattern.GUIPattern)
+        pattern.save = Mock()
+
+        with patch.dict(sys.modules, {"pygarment.meshgen.simulation": fake_simulation, "warp": fake_warp}):
+            with patch.object(gui_pattern.platform, "system", return_value="Darwin"):
+                with self.assertRaises(gui_pattern.MissingWarpError) as context:
+                    pattern.drape_3d()
+
+        self.assertIn("macOS CPU-only Warp build", str(context.exception))
+        fake_run_sim.assert_not_called()
+        pattern.save.assert_not_called()
+
+
 if __name__ == "__main__":
     unittest.main()
