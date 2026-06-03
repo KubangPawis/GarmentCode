@@ -8,6 +8,8 @@ import igl
 import numpy as np
 import math
 import svgpathtools as svgpath
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 import shutil
 import pickle

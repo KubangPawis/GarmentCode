@@ -18,6 +18,8 @@ import cairosvg
 import svgpathtools as svgpath
 import svgwrite as sw
 
+import matplotlib
+matplotlib.use('Agg')
 import matplotlib.pyplot as plt
 
 # my
