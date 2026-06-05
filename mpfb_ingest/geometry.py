@@ -1,5 +1,6 @@
 """Pure geometry primitives. All inputs/outputs in centimetres (mesh pre-scaled)."""
 import numpy as np
+import igl
 
 _Y = np.array([0.0, 1.0, 0.0])
 
@@ -35,3 +36,61 @@ def slice_perimeter(mesh, y, pick="longest", point=None):
                                             + (L[:, 2].mean() - pz) ** 2)
         return _loop_perimeter(nearest)
     return max(_loop_perimeter(L) for L in loops)
+
+
+def euclidean(p, q):
+    return float(np.linalg.norm(np.asarray(p, float) - np.asarray(q, float)))
+
+
+def delta_y(p, q):
+    return float(abs(float(p[1]) - float(q[1])))
+
+
+def angle_to_horizontal(p, q):
+    """Degrees between vector p->q and the horizontal (XZ) plane."""
+    v = np.asarray(q, float) - np.asarray(p, float)
+    horiz = float(np.linalg.norm([v[0], v[2]]))
+    return float(np.degrees(np.arctan2(abs(v[1]), horiz)))
+
+
+def angle_to_vertical(p, q):
+    """Degrees between vector p->q and vertical (Y). 0 = perfectly vertical."""
+    return 90.0 - angle_to_horizontal(p, q)
+
+
+def geodesic(mesh, src_idx, dst_idx):
+    """Exact surface geodesic distance between two vertex indices (cm)."""
+    v = np.ascontiguousarray(mesh.vertices, dtype=np.float64)
+    f = np.ascontiguousarray(mesh.faces, dtype=np.int64)
+    d = igl.exact_geodesic(
+        v, f,
+        VS=np.array([src_idx], dtype=np.int64),
+        VT=np.array([dst_idx], dtype=np.int64),
+    )
+    return float(np.atleast_1d(d)[0])
+
+
+def arc_between(loop, a, b, side="back", back_sign=-1.0):
+    """Length along an ordered closed loop polyline between the loop points
+    nearest to a and b, taking the branch on the requested side.
+
+    side='back' selects the branch whose mean Z has sign == back_sign
+    (facing convention: front = +Z, back = -Z by default).
+    """
+    ia = int(np.argmin(np.linalg.norm(loop - np.asarray(a, float), axis=1)))
+    ib = int(np.argmin(np.linalg.norm(loop - np.asarray(b, float), axis=1)))
+    lo, hi = sorted((ia, ib))
+    branch1 = loop[lo:hi + 1]
+    branch2 = np.vstack([loop[hi:], loop[:lo + 1]])
+
+    def _len(poly):
+        return float(np.sum(np.linalg.norm(np.diff(poly, axis=0), axis=1)))
+
+    if side == "back":
+        z1, z2 = branch1[:, 2].mean(), branch2[:, 2].mean()
+        chosen = branch1 if (np.sign(z1) == np.sign(back_sign)) else branch2
+        if np.sign(z1) == np.sign(z2):
+            chosen = branch1   # symmetric proxy: either half is equal
+    else:
+        chosen = branch1
+    return _len(chosen)
