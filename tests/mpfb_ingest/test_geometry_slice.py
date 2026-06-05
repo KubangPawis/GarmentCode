@@ -1,3 +1,4 @@
+import pytest
 import numpy as np
 from mpfb_ingest import geometry
 
@@ -14,3 +15,9 @@ def test_slice_loops_returns_ordered_polyline(cylinder_cm):
     loop = loops[0]
     assert loop.shape[1] == 3
     assert len(loop) > 16
+
+
+def test_slice_perimeter_nearest_requires_point(cylinder_cm):
+    import pytest
+    with pytest.raises(ValueError):
+        geometry.slice_perimeter(cylinder_cm, y=50.0, pick="nearest")
