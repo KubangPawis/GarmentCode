@@ -1,6 +1,6 @@
 """Load and normalize an MPFB-exported body mesh into GarmentCode's space."""
+from __future__ import annotations
 from pathlib import Path
-import numpy as np
 import trimesh
 
 
@@ -12,11 +12,13 @@ def load_body(path) -> trimesh.Trimesh:
     return obj
 
 
-def normalize(mesh: trimesh.Trimesh, expected_height_m: float = 1.7):
+def normalize(mesh: trimesh.Trimesh, expected_height_m: float = 1.7) -> tuple[trimesh.Trimesh, dict]:
     """Return (mesh_in_metres, report).
 
     Steps: detect unit scale from total Y-extent vs expected human height,
-    scale to metres, centre X/Z on the centroid, ground feet to Y=0.
+    scale to metres, centre X/Z on the axis-aligned bounding-box midpoint,
+    ground feet to Y=0. Bounding-box midpoint (not mass centroid) is used so
+    centring is deterministic and independent of mesh density/asymmetry.
     Assumes the mesh is already Y-up (MakeHuman default).
     """
     mesh = mesh.copy()
@@ -26,9 +28,11 @@ def normalize(mesh: trimesh.Trimesh, expected_height_m: float = 1.7):
     scale_to_m = expected_height_m / raw_height
     mesh.apply_scale(scale_to_m)
 
-    cx, _, cz = mesh.centroid
+    (x0, _, z0), (x1, _, z1) = mesh.bounds
+    x_mid = 0.5 * (x0 + x1)
+    z_mid = 0.5 * (z0 + z1)
     min_y = mesh.bounds[0][1]
-    mesh.apply_translation([-cx, -min_y, -cz])
+    mesh.apply_translation([-x_mid, -min_y, -z_mid])
 
     report = {
         "scale_to_m": scale_to_m,
