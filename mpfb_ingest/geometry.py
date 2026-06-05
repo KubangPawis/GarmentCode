@@ -50,6 +50,7 @@ def angle_to_horizontal(p, q):
     """Degrees between vector p->q and the horizontal (XZ) plane."""
     v = np.asarray(q, float) - np.asarray(p, float)
     horiz = float(np.linalg.norm([v[0], v[2]]))
+    # Degenerate p == q gives horiz == 0 -> arctan2(0, 0) == 0.0 (returns 0 degrees).
     return float(np.degrees(np.arctan2(abs(v[1]), horiz)))
 
 
@@ -88,9 +89,14 @@ def arc_between(loop, a, b, side="back", back_sign=-1.0):
 
     if side == "back":
         z1, z2 = branch1[:, 2].mean(), branch2[:, 2].mean()
-        chosen = branch1 if (np.sign(z1) == np.sign(back_sign)) else branch2
         if np.sign(z1) == np.sign(z2):
-            chosen = branch1   # symmetric proxy: either half is equal
+            # Branches not distinguishable front/back (symmetric or off-centre
+            # cut) -> proxy to branch1; halves are equal in the symmetric case.
+            chosen = branch1
+        elif np.sign(z1) == np.sign(back_sign):
+            chosen = branch1
+        else:
+            chosen = branch2
     else:
         chosen = branch1
     return _len(chosen)

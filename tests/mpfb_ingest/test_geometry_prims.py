@@ -34,4 +34,11 @@ def test_back_arc_half_circle(cylinder_cm):
     left = loop[np.argmin(loop[:, 0])]
     right = loop[np.argmax(loop[:, 0])]
     arc = geometry.arc_between(loop, left, right, side="back")
-    assert abs(arc - np.pi * 15.0) < 1.0
+    assert abs(arc - np.pi * 15.0) < 0.1
+
+
+def test_angle_to_vertical(tiny_mesh):
+    p = tiny_mesh.vertices[0]
+    q = tiny_mesh.vertices[3]
+    assert abs(geometry.angle_to_vertical(p, q)
+               - (90.0 - geometry.angle_to_horizontal(p, q))) < 1e-9
