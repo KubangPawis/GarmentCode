@@ -1,10 +1,11 @@
 import numpy as np
 from mpfb_ingest.landmarks import Landmarks
 from mpfb_ingest import measurements
+from mpfb_ingest import geometry as geo
 
 
 def test_back_widths_on_cylinder(cylinder_cm):
-    loop = measurements.geo.slice_loops(cylinder_cm, 50.0)[0]
+    loop = geo.slice_loops(cylinder_cm, 50.0)[0]
     li = int(np.argmin(loop[:, 0]))
     ri = int(np.argmax(loop[:, 0]))
     # map those loop points to nearest mesh vertices for landmark indices
