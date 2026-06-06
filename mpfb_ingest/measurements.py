@@ -52,3 +52,47 @@ def back_widths(mesh, lm, level_y=None, back_sign=-1.0):
                                      lm.point(mesh, rname),
                                      side="back", back_sign=back_sign)
     return out
+
+
+_EUCLID = {
+    "shoulder_w":    ("collar_l", "collar_r"),
+    "head_l":        ("nape", "crown"),
+    "bust_points":   ("bust_l", "bust_r"),
+    "bum_points":    ("bum_l", "bum_r"),
+    "armscye_depth": ("shoulder_r", "armpit_r"),
+    "arm_length":    ("shoulder_r", "wrist_r"),   # geodesic (see below) overrides
+}
+_DELTA_Y = {
+    "hips_line":       ("waist", "hips"),
+    "crotch_hip_diff": ("hips", "crotch_lvl"),
+    "vert_bust_line":  ("nape_lvl", "bust"),
+}
+_GEODESIC = {
+    "waist_line":           ("nape", "waist_back"),
+    "bust_line":            ("shoulder_r", "bust_r"),
+    "waist_over_bust_line": ("neck_base", "waist_front"),
+    "arm_length":           ("shoulder_r", "wrist_r"),
+}
+
+
+def distances(mesh, lm, level_y=None):
+    ly = level_y if level_y is not None else (lambda n: lm.level_y(mesh, n))
+    out = {}
+    out["height"] = float(mesh.bounds[1][1] - mesh.bounds[0][1])
+
+    for field, (a, b) in _EUCLID.items():
+        if field == "arm_length":
+            continue   # prefer geodesic version below
+        if a in lm.vertices and b in lm.vertices:
+            out[field] = geo.euclidean(lm.point(mesh, a), lm.point(mesh, b))
+
+    for field, (a, b) in _DELTA_Y.items():
+        la = a if a in lm.levels else None
+        lb = b if b in lm.levels else None
+        if la and lb:
+            out[field] = abs(ly(la) - ly(lb))
+
+    for field, (a, b) in _GEODESIC.items():
+        if a in lm.vertices and b in lm.vertices:
+            out[field] = geo.geodesic(mesh, lm.vertex_index(a), lm.vertex_index(b))
+    return out
