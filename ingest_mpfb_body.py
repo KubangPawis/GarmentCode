@@ -3,7 +3,10 @@
 Usage:
   ./.venv/bin/python ingest_mpfb_body.py avatar.obj --name avatar \
       --landmarks mpfb_ingest/data/makehuman_landmarks.json \
-      --arm-pose-angle 90 --out assets/bodies --save-obj
+      --arm-pose-angle 0 --out assets/bodies --save-obj
+
+Pass --arm-pose-angle 0 for a T-pose MPFB avatar (arms horizontal); see
+mpfb_ingest/README.md "Pose conventions" for the full reference.
 """
 import argparse
 
@@ -56,7 +59,8 @@ def main():
     ap.add_argument("--name", required=True)
     ap.add_argument("--landmarks", required=True)
     ap.add_argument("--arm-pose-angle", type=float, required=True,
-                    help="Arm pose at the shoulder joint (deg). See module README.")
+                    help="Arm droop from horizontal (deg). 0 = T-pose (MPFB). "
+                         "See mpfb_ingest/README.md.")
     ap.add_argument("--out", default="assets/bodies")
     ap.add_argument("--height-m", type=float, default=1.7)
     ap.add_argument("--save-obj", action="store_true")
