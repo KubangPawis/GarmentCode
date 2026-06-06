@@ -87,10 +87,8 @@ def distances(mesh, lm, level_y=None):
             out[field] = geo.euclidean(lm.point(mesh, a), lm.point(mesh, b))
 
     for field, (a, b) in _DELTA_Y.items():
-        la = a if a in lm.levels else None
-        lb = b if b in lm.levels else None
-        if la and lb:
-            out[field] = abs(ly(la) - ly(lb))
+        if a in lm.levels and b in lm.levels:
+            out[field] = abs(ly(a) - ly(b))
 
     for field, (a, b) in _GEODESIC.items():
         if a in lm.vertices and b in lm.vertices:
