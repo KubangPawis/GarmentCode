@@ -1,4 +1,3 @@
-import numpy as np
 from mpfb_ingest.landmarks import Landmarks
 from mpfb_ingest import measurements
 
