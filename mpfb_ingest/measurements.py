@@ -2,6 +2,7 @@
 
 Implemented from docs/Body Measurements GarmentCode.pdf (spec section 2.4).
 """
+from collections import OrderedDict
 from . import geometry as geo
 
 
@@ -94,3 +95,24 @@ def distances(mesh, lm, level_y=None):
         if a in lm.vertices and b in lm.vertices:
             out[field] = geo.geodesic(mesh, lm.vertex_index(a), lm.vertex_index(b))
     return out
+
+
+def angles(mesh, lm, arm_pose_angle):
+    out = {"arm_pose_angle": float(arm_pose_angle)}
+    if "neck_base" in lm.vertices and "collar_r" in lm.vertices:
+        out["shoulder_incl"] = geo.angle_to_horizontal(
+            lm.point(mesh, "neck_base"), lm.point(mesh, "collar_r"))
+    if "waist_side" in lm.vertices and "hip_side" in lm.vertices:
+        out["hip_inclination"] = geo.angle_to_vertical(
+            lm.point(mesh, "waist_side"), lm.point(mesh, "hip_side"))
+    return out
+
+
+def compute_all(mesh, lm, arm_pose_angle, level_y=None):
+    """Run every group; return an OrderedDict of all available base fields."""
+    result = OrderedDict()
+    result.update(circumferences(mesh, lm, level_y=level_y))
+    result.update(back_widths(mesh, lm, level_y=level_y))
+    result.update(distances(mesh, lm, level_y=level_y))
+    result.update(angles(mesh, lm, arm_pose_angle=arm_pose_angle))
+    return result
