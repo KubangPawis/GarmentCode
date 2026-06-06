@@ -30,3 +30,25 @@ def circumferences(mesh, lm, level_y=None):
         out["leg_circ"] = geo.slice_perimeter(mesh, ly("thigh"), pick="nearest",
                                               point=(p[0], p[2]))
     return out
+
+
+_BACK = {
+    "waist_back_width": ("waist", "side_l_waist", "side_r_waist"),
+    "back_width":       ("bust",  "side_l_bust",  "side_r_bust"),
+    "hip_back_width":   ("hips",  "side_l_hips",  "side_r_hips"),
+    "neck_w":           ("neck",  "side_l_neck",  "side_r_neck"),
+}
+
+
+def back_widths(mesh, lm, level_y=None, back_sign=-1.0):
+    ly = level_y if level_y is not None else (lambda n: lm.level_y(mesh, n))
+    out = {}
+    for field, (level, lname, rname) in _BACK.items():
+        if lname not in lm.vertices or rname not in lm.vertices:
+            continue
+        loops = geo.slice_loops(mesh, ly(level))
+        loop = max(loops, key=lambda L: len(L))
+        out[field] = geo.arc_between(loop, lm.point(mesh, lname),
+                                     lm.point(mesh, rname),
+                                     side="back", back_sign=back_sign)
+    return out
