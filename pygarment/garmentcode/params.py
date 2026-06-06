@@ -14,9 +14,10 @@ class BodyParametrizationBase:
     """
 
     def __init__(self, param_file='') -> None:
-        
+
         self.params = {}
-        self.load(param_file)
+        if param_file:
+            self.load(param_file)
 
     def __getitem__(self, key):
         return self.params[key]
