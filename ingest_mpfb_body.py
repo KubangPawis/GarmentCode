@@ -6,7 +6,6 @@ Usage:
       --arm-pose-angle 90 --out assets/bodies --save-obj
 """
 import argparse
-from pathlib import Path
 
 from mpfb_ingest import mesh_io, measurements, emit
 from mpfb_ingest.landmarks import Landmarks
@@ -35,6 +34,8 @@ def run(obj_path, out_dir, name, landmarks_path, arm_pose_angle,
         lm.validate(cm)
 
     measured = measurements.compute_all(cm, lm, arm_pose_angle=arm_pose_angle)
+    # height also comes from compute_all (measurements.distances); reasserted here
+    # so the CLI owns it directly even if the measurement grouping is refactored.
     measured["height"] = float(cm.bounds[1][1] - cm.bounds[0][1])
 
     if fill_defaults:
