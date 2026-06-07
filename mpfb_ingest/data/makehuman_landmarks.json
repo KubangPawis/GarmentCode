@@ -1,0 +1,15 @@
+{
+  "_provenance": "clean-room girth-scan + CC0 MakeHuman measure rings; quick pass, anchors via CLI --fill-defaults",
+  "n_vertices_expected": 13345,
+  "vertices": {
+    "side_l_waist": 3987,
+    "side_r_waist": 10759
+  },
+  "levels": {
+    "hips": 4790,
+    "waist": 4462,
+    "bust": 1574,
+    "underbust": 1962,
+    "neck": 486
+  }
+}

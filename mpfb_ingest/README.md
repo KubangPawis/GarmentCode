@@ -87,9 +87,42 @@ The result `assets/bodies/<name>.yaml` is consumed directly by pattern generatio
 
 Measurement extraction relies on `mpfb_ingest/data/makehuman_landmarks.json` mapping
 semantic landmark names to **constant vertex indices** on MakeHuman's fixed topology.
-That file is produced by a one-time calibration against a real MPFB export OBJ and is
-**not yet present** — until it is, run with `--fill-defaults` (and a minimal landmarks
-JSON enabling only `height`) for a smoke-level result.
+
+### Quick-pass calibration (present)
+
+`scripts/calibrate_landmarks.py` calibrates against MakeHuman's bundled base mesh
+(the MPFB extension's `data/3dobjs/base.obj`, 21,833 verts). It:
+
+1. **Strips helper geometry** — keeps only faces within the body vertex range
+   (`[0, 13380)`); eyes/teeth/joint-cube helpers are dropped, since they skew the
+   bounding box and inject stray slice loops. The result is committed as the
+   body-only mesh `mpfb_ingest/data/mpfb_base_body.obj` (13,345 verts).
+2. **Finds the torso levels by an anatomical girth scan** (waist = narrowest torso
+   slice, hips/bust = the widening below/above it, underbust between).
+3. **Takes the waist side-landmarks from MakeHuman's CC0 `measure-waist-circ` ring.**
+
+This yields real geometry for **height, waist, bust, underbust, hips, and
+`waist_back_width`** (validated by `tests/mpfb_ingest/test_calibration_realmesh.py`).
+The remaining back-section widths and all geodesic/point anchors are still served by
+`--fill-defaults` — the bust/hips/neck measure rings are too broad to place reliably
+and the full-fidelity anchor pass is future work.
+
+Regenerate the calibration + body mesh with:
+
+```bash
+MPFB_BASE_OBJ_DATA="/path/to/mpfb/data" \
+  PYTHONPATH=. .venv/bin/python scripts/calibrate_landmarks.py
+```
+
+### Using your own MPFB avatar
+
+The committed landmark indices are in the **body-only** numbering produced by the strip
+step above. A raw MPFB OBJ export carries helper geometry (or a different vertex count
+if exported with subdivision/proxies), so its indices will not match. Until the strip
+is wired into the CLI, run an export through the same body-only reduction first (the
+`_body_only` step in the calibration script), and confirm the vertex count matches
+`n_vertices_expected` in the JSON. If your export's topology differs, re-run the
+calibration script against it.
 
 ## Draping note (out of scope here)
 
