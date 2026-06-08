@@ -9,7 +9,6 @@ import bpy
 import sys
 import os
 import json
-import itertools
 import importlib
 
 
@@ -33,28 +32,65 @@ def _macro(gender, age, weight, muscle, height, cup, race):
 
 
 def _grid(limit=None):
+    """Single-axis sweeps off a fixed female base + a male base, so the
+    cross-body property tests always have clean one-variable groups (vary
+    weight only / height only / cup only / gender only). Deterministic.
+    """
+    base = dict(g=0.0, a=0.5, w=0.5, mu=0.5, h=0.5, c=0.5, race="caucasian")
     out = [("neutral", _macro(0.5, 0.5, 0.5, 0.5, 0.5, 0.5, "caucasian"))]
-    genders = [0.0, 1.0]
-    ages = [0.5, 0.9]
-    weights = [0.0, 0.5, 1.0]
-    muscles = [0.0, 0.5, 1.0]
-    heights = [0.0, 0.5, 1.0]
-    cups = [0.0, 0.5, 1.0]
-    races = ["caucasian", "asian", "african"]
-    i = 0
-    for g, a, w, m, h, c, race in itertools.product(
-            genders, ages, weights, muscles, heights, cups, races):
-        i += 1
-        extreme = (w in (0.0, 1.0) or h in (0.0, 1.0) or c in (0.0, 1.0))
-        if not extreme and i % 7 != 0:
-            continue
-        gname = "m" if g >= 0.5 else "f"
-        idn = (f"{gname}_a{int(a * 100)}_w{int(w * 100)}_mu{int(m * 100)}"
-               f"_h{int(h * 100)}_c{int(c * 100)}_{race[:3]}")
-        out.append((idn, _macro(g, a, w, m, h, c, race)))
-        if limit and len(out) >= limit:
-            break
+    seen = {"neutral"}
+
+    def add(**kw):
+        p = {**base, **kw}
+        gname = "m" if p["g"] >= 0.5 else "f"
+        idn = (f"{gname}_a{int(p['a'] * 100)}_w{int(p['w'] * 100)}"
+               f"_mu{int(p['mu'] * 100)}_h{int(p['h'] * 100)}"
+               f"_c{int(p['c'] * 100)}_{p['race'][:3]}")
+        if idn in seen:
+            return
+        seen.add(idn)
+        out.append((idn, _macro(p["g"], p["a"], p["w"], p["mu"],
+                                p["h"], p["c"], p["race"])))
+
+    add()                                            # female base
+    for w in (0.0, 0.25, 0.5, 0.75, 1.0):            # weight sweep -> waist
+        add(w=w)
+    for h in (0.0, 0.25, 0.5, 0.75):                 # height sweep -> stature
+        add(h=h)                                     # h=1.0 ~ 2.3 m, past sane range
+    for c in (0.0, 0.25, 0.5, 0.75, 1.0):            # cup sweep -> bust
+        add(c=c)
+    for mu in (0.0, 0.5, 1.0):                       # muscle sweep
+        add(mu=mu)
+    for race in ("caucasian", "asian", "african"):   # ethnicity at base
+        add(race=race)
+    # male base (cup irrelevant) + male weight/height sweeps; the female and
+    # male c=0 bodies differ only in gender -> shoulder_w comparison.
+    for w in (0.0, 0.5, 1.0):
+        add(g=1.0, c=0.0, w=w)
+    for h in (0.0, 0.5, 0.75):
+        add(g=1.0, c=0.0, h=h)
+
+    if limit:
+        out = out[:limit]
     return out
+
+
+def _bake_shape_keys(ob):
+    """Flatten MPFB macro shape keys into the mesh basis.
+
+    MPFB drives the macro sliders (weight/height/cup/...) as Blender shape
+    keys, so the un-baked mesh basis is the neutral body for every macro and
+    glTF would export the morph as a target the downstream trimesh loader
+    ignores. Bake the current mix into the basis, then drop all keys.
+    """
+    keys = ob.data.shape_keys
+    if not keys or not keys.key_blocks:
+        return
+    ob.shape_key_add(name="_baked", from_mix=True)
+    for kb in list(ob.data.shape_keys.key_blocks):
+        if kb.name != "_baked":
+            ob.shape_key_remove(kb)
+    ob.shape_key_remove(ob.data.shape_keys.key_blocks["_baked"])
 
 
 def _arg(argv, name, default=None):
@@ -76,12 +112,14 @@ def main():
         human = human_svc.create_human(macro_detail_dict=macro, feet_on_ground=True)
         copy = export_svc.create_character_copy(human)
         export_svc.bake_modifiers_remove_helpers(copy, remove_helpers=True)
+        _bake_shape_keys(copy)
         bpy.ops.object.select_all(action="DESELECT")
         copy.select_set(True)
         bpy.context.view_layer.objects.active = copy
         path = os.path.join(out_dir, idn + ".glb")
         bpy.ops.export_scene.gltf(filepath=path, use_selection=True,
-                                  export_format="GLB", export_yup=True)
+                                  export_format="GLB", export_yup=True,
+                                  export_morph=False)
         manifest[idn] = macro
         print("WROTE", path)
 
