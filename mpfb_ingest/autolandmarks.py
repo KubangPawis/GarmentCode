@@ -20,6 +20,21 @@ def _girth(mesh, y, keep_x):
         return float("nan")
 
 
+def _clipped_loop_metrics(mesh, y, keep_x):
+    """(clipped-torso perimeter, lateral X half-width) of the central loop at y.
+
+    The half-width is the arm-shelf discriminator: the shoulder/deltoid shelf
+    widens the torso laterally (X), whereas a large bust widens it frontally
+    (Z) at near-constant X. Keying arm-merge on X-width therefore avoids
+    mistaking a big breast for the arm zone. Returns (nan, nan) on failure.
+    """
+    try:
+        loop = geo.central_loop(mesh, float(y), keep_x)
+    except Exception:
+        return float("nan"), float("nan")
+    return geo._loop_perimeter(loop), float(np.max(np.abs(loop[:, 0])))
+
+
 def _full_girth(mesh, y):
     try:
         return geo.slice_perimeter(mesh, float(y), pick="longest")
@@ -37,7 +52,9 @@ def find_levels(mesh):
     top = float(mesh.bounds[1][1])
     keep_x = 1.6 * geo.torso_halfwidth(mesh)
     ys = np.arange(2.0, top, 1.0)
-    gc = np.array([_girth(mesh, y, keep_x) for y in ys])   # clipped (arm-excluded)
+    _m = [_clipped_loop_metrics(mesh, y, keep_x) for y in ys]
+    gc = np.array([p for p, _ in _m])                      # clipped (arm-excluded)
+    xw = np.array([w for _, w in _m])                      # clipped lateral X half-width
     gf = np.array([_full_girth(mesh, y) for y in ys])      # full (arms included)
 
     def band(arr, lo, hi):
@@ -70,8 +87,10 @@ def find_levels(mesh):
             continue
         j = i - 4
         spiked = np.isfinite(ratio[i]) and ratio[i] > 1.4
-        jumped = (j >= 0 and np.isfinite(gc[i]) and np.isfinite(gc[j])
-                  and gc[j] > 1.0 and gc[i] > 1.22 * gc[j])
+        # lateral widening = deltoid / shoulder shelf entering the section (NOT a
+        # frontal bust bulge, which leaves X-width unchanged).
+        jumped = (j >= 0 and np.isfinite(xw[i]) and np.isfinite(xw[j])
+                  and xw[j] > 1.0 and xw[i] > 1.30 * xw[j])
         if spiked or jumped:
             arm_merge = float(y)
             break
@@ -248,11 +267,17 @@ def derive(mesh, *, arm_pose="tpose"):
     _sl, sr = _loop_side_points(sh_loop)
     vtx["shoulder_r"] = _nearest_vertex(mesh, sr)   # broad shoulder tip (armscye/arm)
 
-    # clavicle ends: front extreme-X at the collar level. Scan UP from the bust
-    # for the highest torso level whose (arm-clipped) front-half X span is in the
-    # clavicle band [35,48] cm, stopping when the span explodes (>55 -> deltoid /
-    # merged arm zone) or collapses (<30 -> neck). This is robust to a true
-    # T-pose where the neck-minus-offset heuristic would land in the thin neck.
+    # clavicle ends: front extreme-X at the collar level. Scan DOWN from the
+    # neck for the HIGHEST level whose (arm-clipped) front-half X span has
+    # broadened to a clavicle width (28..50 cm) -- i.e. just below where the
+    # section widens from neck to shoulders but above the deltoid shelf. Going
+    # top-down means the first qualifying level is the clavicle, not the wider
+    # deltoid plateau beneath it. This is stable across morphs: the old upward
+    # [35,48] scan flipped between the bust level and a neck-6 fallback on a
+    # sub-centimetre span change, making shoulder_incl bimodal (15 deg vs 46
+    # deg) across otherwise-identical male bodies. A true T-pose (merged arms)
+    # has no clean clavicle band -- the span jumps straight from neck to
+    # deltoid -- so it falls through to the neck-6 heuristic.
     keep_x = levels["keep_x"]
 
     def _front_xspan(loop):
@@ -265,19 +290,15 @@ def derive(mesh, *, arm_pose="tpose"):
             fxc = fx
         return float(fxc.max() - fxc.min())
 
-    col_y = levels["neck"] - 6.0                         # heuristic fallback
-    best_y = None
-    for _cy in np.arange(levels["bust"] + 1.0, levels["neck"] + 1.0, 1.0):
+    col_y = levels["neck"] - 6.0                         # heuristic fallback (T-pose)
+    for _cy in np.arange(levels["neck"] - 1.0, levels["bust"], -1.0):
         try:
             span = _front_xspan(geo.central_loop(mesh, float(_cy)))
         except Exception:
             continue
-        if 35.0 <= span <= 48.0:
-            best_y = float(_cy)                           # topmost good level wins
-        elif span > 55.0 or span < 30.0:
+        if 28.0 <= span <= 50.0:
+            col_y = float(_cy)
             break
-    if best_y is not None:
-        col_y = best_y
     col_loop = geo.central_loop(mesh, col_y)
     _front = col_loop[col_loop[:, 2] >= col_loop[:, 2].mean()]   # front half
     if len(_front) < 2:
