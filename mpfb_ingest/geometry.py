@@ -107,25 +107,26 @@ def angle_to_vertical(p, q):
 def geodesic(mesh, src_idx, dst_idx):
     """Exact surface geodesic distance between two vertex indices (cm).
 
-    Falls back to Euclidean when the two vertices are on different connected
-    components (igl returns 0 for such pairs).
+    The mesh is welded (duplicate vertices merged) before the geodesic so that
+    meshes loaded unprocessed -- which split shared edges into many spurious
+    'components' -- are treated as the single connected surface they represent.
+    Falls back to Euclidean only when the welded endpoints are genuinely on
+    different connected components (igl then returns 0).
     """
+    import trimesh
     v = np.ascontiguousarray(mesh.vertices, dtype=np.float64)
-    f = np.ascontiguousarray(mesh.faces, dtype=np.int64)
-    _empty = np.array([], dtype=np.int64)
+    f = np.asarray(mesh.faces)
+    uniq, inv = trimesh.grouping.unique_rows(v)
+    Vw = np.ascontiguousarray(v[uniq], dtype=np.float64)
+    Fw = np.ascontiguousarray(inv[f], dtype=np.int64)
+    s, t = int(inv[src_idx]), int(inv[dst_idx])
     d = igl.exact_geodesic(
-        v, f,
-        VS=np.array([src_idx], dtype=np.int64),
-        FS=_empty,
-        VT=np.array([dst_idx], dtype=np.int64),
-        FT=_empty,
+        Vw, Fw,
+        VS=np.array([s], dtype=np.int64), FS=np.array([], dtype=np.int64),
+        VT=np.array([t], dtype=np.int64), FT=np.array([], dtype=np.int64),
     )
     result = float(np.atleast_1d(d)[0])
-    # igl returns 0 when src == dst OR when vertices are on different mesh
-    # components (disconnected islands).  Detect the latter by comparing to the
-    # Euclidean distance: if the geodesic is suspiciously small relative to the
-    # straight-line gap, fall back to Euclidean as the best available estimate.
-    if result < 1e-6 and src_idx != dst_idx:
+    if result < 1e-6 and s != t:
         result = euclidean(v[src_idx], v[dst_idx])
     return result
 

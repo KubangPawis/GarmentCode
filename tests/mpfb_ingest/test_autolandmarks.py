@@ -54,7 +54,9 @@ def test_derive_full_field_set_on_base():
     missing = required - set(out)
     assert not missing, f"missing geometric fields: {sorted(missing)}"
     # sane ranges for a ~170 cm body
-    assert 25 <= out["shoulder_w"] <= 55
+    assert 30 <= out["shoulder_w"] <= 45       # clavicle span, not deltoid
+    assert 8 <= out["armscye_depth"] <= 20      # right-side underarm
+    assert 25 <= out["waist_line"] <= 45        # welded surface geodesic
     assert 20 <= out["head_l"] <= 32
     assert 40 <= out["arm_length"] <= 75
     assert 0 <= out["shoulder_incl"] <= 45

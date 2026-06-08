@@ -217,20 +217,28 @@ def derive(mesh, *, arm_pose="tpose"):
     # shoulders / collar (widest torso just below the arm merge) --------------
     sh_y = max(levels["bust"] + 2.0, arm_merge - 4.0)
     sh_loop = geo.central_loop(mesh, sh_y)
-    sl, sr = _loop_side_points(sh_loop)
-    vtx["collar_l"] = _nearest_vertex(mesh, sl)
-    vtx["collar_r"] = _nearest_vertex(mesh, sr)
-    vtx["shoulder_r"] = vtx["collar_r"]
+    _sl, sr = _loop_side_points(sh_loop)
+    vtx["shoulder_r"] = _nearest_vertex(mesh, sr)   # broad shoulder tip (armscye/arm)
 
-    # armpit: lowest height with a distinct side arm-loop ----------------------
+    # clavicle ends: front extreme-X just below the neck, above the deltoid bulge
+    col_y = levels["neck"] - 6.0
+    col_loop = geo.central_loop(mesh, col_y)
+    _front = col_loop[col_loop[:, 2] >= col_loop[:, 2].mean()]   # front half
+    if len(_front) < 2:
+        _front = col_loop
+    vtx["collar_l"] = _nearest_vertex(mesh, _front[int(np.argmin(_front[:, 0]))])
+    vtx["collar_r"] = _nearest_vertex(mesh, _front[int(np.argmax(_front[:, 0]))])
+
+    # armpit_r: inner edge of the RIGHT (+X) arm at the lowest height the arm is
+    # still a distinct side loop (the underarm crease).
     half_w = abs(float(sh_loop[:, 0].max()))
     armpit_pt = sr
-    for _ay in np.arange(arm_merge - 12.0, arm_merge + 12.0, 1.0):
-        arms = _arm_loops(mesh, float(_ay), 0.6 * half_w)
+    for _ay in np.arange(arm_merge + 8.0, arm_merge - 16.0, -1.0):   # scan downward
+        arms = [L for L in _arm_loops(mesh, float(_ay), 0.45 * half_w)
+                if float(np.mean(L[:, 0])) > 0.0]                    # right side only
         if arms:
-            armpit_pt = min((L[int(np.argmin(L[:, 1]))] for L in arms),
-                            key=lambda p: p[1])
-            break
+            arm = min(arms, key=lambda L: abs(float(np.mean(L[:, 0]))))  # nearest torso
+            armpit_pt = arm[int(np.argmin(arm[:, 0]))]              # inner edge toward torso
     vtx["armpit_r"] = _nearest_vertex(mesh, armpit_pt)
 
     # wrist: anatomical wrist position on a T-pose (horizontal) arm.
