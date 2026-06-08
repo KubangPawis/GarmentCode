@@ -47,8 +47,7 @@ def back_widths(mesh, lm, level_y=None, back_sign=-1.0):
     for field, (level, lname, rname) in _BACK.items():
         if lname not in lm.vertices or rname not in lm.vertices:
             continue
-        loops = geo.slice_loops(mesh, ly(level))
-        loop = max(loops, key=lambda L: len(L))
+        loop = geo.central_loop(mesh, ly(level))
         out[field] = geo.arc_between(loop, lm.point(mesh, lname),
                                      lm.point(mesh, rname),
                                      side="back", back_sign=back_sign)
