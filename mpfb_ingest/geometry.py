@@ -83,6 +83,27 @@ def central_perimeter(mesh, y):
     return _loop_perimeter(central_loop(mesh, y))
 
 
+def torso_halfwidth(mesh):
+    """Robust torso half-width (cm): the 97th-percentile |X| over the mid-lower
+    body band, where a T-pose has no arms (arms sit at shoulder height)."""
+    V = np.asarray(mesh.vertices)
+    top = float(V[:, 1].max())
+    band = (V[:, 1] > 0.30 * top) & (V[:, 1] < 0.52 * top)
+    xs = np.abs(V[band, 0]) if band.any() else np.abs(V[:, 0])
+    return float(np.percentile(xs, 97))
+
+
+def torso_perimeter(mesh, y, keep_x):
+    """Tape-measure torso girth (cm) at height y: the central loop with arm
+    excursions (|X| > keep_x) clipped away and the armpit gaps bridged. Robust
+    to T-pose arms that merge into the torso loop."""
+    loop = central_loop(mesh, y)
+    mask = np.abs(loop[:, 0]) <= keep_x
+    if mask.all() or not mask.any():
+        return _loop_perimeter(loop)
+    return _loop_perimeter(loop[mask])
+
+
 def euclidean(p, q):
     return float(np.linalg.norm(np.asarray(p, float) - np.asarray(q, float)))
 

@@ -13,62 +13,77 @@ from . import geometry as geo
 from .landmarks import Landmarks
 
 
-def _girth(mesh, y):
+def _girth(mesh, y, keep_x):
     try:
-        return geo.central_perimeter(mesh, float(y))
+        return geo.torso_perimeter(mesh, float(y), keep_x)
+    except Exception:
+        return float("nan")
+
+
+def _full_girth(mesh, y):
+    try:
+        return geo.slice_perimeter(mesh, float(y), pick="longest")
     except Exception:
         return float("nan")
 
 
 def find_levels(mesh):
-    """Anatomical girth scan -> {crotch,hips,waist,bust,underbust,neck} as cm Y.
-
-    Mirrors the validated calibrator scan (predecessor section 8.3) but on the
-    arm-excluded central girth, so it is correct under a T-pose. Feet at y=0.
-
-    One literal differs from the offline calibrator: the hips band starts at
-    ``crotch + 1`` (not ``crotch``) so that hips > crotch is guaranteed when the
-    crotch jump lands exactly on the pelvis maximum (as on the MakeHuman base).
+    """Anatomical girth scan -> {crotch,hips,waist,bust,underbust,neck,keep_x,
+    _arm_merge} as cm Y. Arm-aware: uses an X-clipped torso girth for level
+    values and the full/clipped girth ratio to find (and avoid) the arm zone,
+    so it is correct under a true T-pose where arms merge into the torso loop.
+    Feet at y=0.
     """
     top = float(mesh.bounds[1][1])
+    keep_x = 1.6 * geo.torso_halfwidth(mesh)
     ys = np.arange(2.0, top, 1.0)
-    g = np.array([_girth(mesh, y) for y in ys])
-    torso_max = float(np.nanmax(g))
+    gc = np.array([_girth(mesh, y, keep_x) for y in ys])   # clipped (arm-excluded)
+    gf = np.array([_full_girth(mesh, y) for y in ys])      # full (arms included)
+
+    def band(arr, lo, hi):
+        m = (ys >= lo) & (ys <= hi) & np.isfinite(arr)
+        return ys[m], arr[m]
+
+    torso_max = float(np.nanmax(gc))
     thr = 0.7 * torso_max
 
-    def jump_up(lo, hi):
-        for y, gv in zip(ys, g):
-            if lo <= y <= hi and np.isfinite(gv) and gv > thr:
-                return float(y)
-        return None
+    # crotch: legs merge into the pelvis -> first strong clipped-girth jump.
+    crotch = None
+    for y, gv in zip(ys, gc):
+        if 40.0 <= y <= 0.6 * top and np.isfinite(gv) and gv > thr:
+            crotch = float(y)
+            break
+    if crotch is None:
+        crotch = 0.45 * top
 
-    crotch = jump_up(40.0, top * 0.6) or (top * 0.45)
-    arm = jump_up(crotch + 30.0, top * 0.85) or (top * 0.78)
+    # arm zone: lowest height in the upper body where the FULL girth exceeds the
+    # clipped girth by >50% (an arm has entered the slice). Cap torso bands below.
+    with np.errstate(divide="ignore", invalid="ignore"):
+        ratio = gf / np.where(gc > 1.0, gc, np.nan)
+    arm_merge = None
+    for y, r in zip(ys, ratio):
+        if crotch + 30.0 <= y <= 0.9 * top and np.isfinite(r) and r > 1.5:
+            arm_merge = float(y)
+            break
+    if arm_merge is None:
+        arm_merge = 0.80 * top
 
-    def band(lo, hi):
-        m = (ys >= lo) & (ys <= hi) & np.isfinite(g)
-        return ys[m], g[m]
-
-    # hips band starts at crotch+1 to guarantee hips > crotch (the pelvis girth
-    # maximum often coincides with the crotch jump y on a T-pose mesh).
-    hy, hg = band(crotch + 1.0, crotch + 18.0)
+    hy, hg = band(gc, crotch + 1.0, crotch + 18.0)
     hips = float(hy[np.argmax(hg)])
-    wy, wg = band(hips + 5.0, arm - 5.0)
-    waist = float(wy[np.argmin(wg)])
-    by, bg = band(waist + 5.0, arm - 2.0)
-    bust = float(by[np.argmax(bg)])
+    # bust: widest clipped girth between the hips and just below the arm zone.
+    by, bg = band(gc, hips + 10.0, arm_merge - 3.0)
+    bust = float(by[np.argmax(bg)]) if len(by) else (hips + 0.25 * (arm_merge - hips))
+    # waist: narrowest clipped girth between the hips and the bust.
+    wy, wg = band(gc, hips + 5.0, bust - 3.0)
+    waist = float(wy[np.argmin(wg)]) if len(wy) else (0.5 * (hips + bust))
     underbust = 0.5 * (waist + bust)
-    # Neck: scan just above the arm-merge in the throat zone only.
-    # Extending to top*0.95 scans through the whole head and picks tiny
-    # interior loops (mouth, nostril, ear canal) whose girth is smaller than
-    # the true neck.  arm + 20 cm captures the throat (~10-20 cm above the
-    # shoulder junction) where the minimum neck girth reliably lives.
-    ny, ng = band(arm, min(arm + 20.0, top * 0.95))
-    neck = float(ny[np.argmin(ng)]) if len(ny) else (top * 0.9)
+    # neck: narrowest clipped girth ABOVE the arm zone (true neck, no skull loop).
+    ny, ng = band(gc, arm_merge + 3.0, 0.95 * top)
+    neck = float(ny[np.argmin(ng)]) if len(ny) else (0.88 * top)
 
     return {"crotch": crotch, "hips": hips, "waist": waist,
             "bust": bust, "underbust": underbust, "neck": neck,
-            "_arm_merge": arm}
+            "keep_x": keep_x, "_arm_merge": arm_merge}
 
 
 def _nearest_vertex(mesh, point):
@@ -220,12 +235,41 @@ def derive(mesh, *, arm_pose="tpose"):
     _sl, sr = _loop_side_points(sh_loop)
     vtx["shoulder_r"] = _nearest_vertex(mesh, sr)   # broad shoulder tip (armscye/arm)
 
-    # clavicle ends: front extreme-X just below the neck, above the deltoid bulge
-    col_y = levels["neck"] - 6.0
+    # clavicle ends: front extreme-X at the collar level. Scan UP from the bust
+    # for the highest torso level whose (arm-clipped) front-half X span is in the
+    # clavicle band [35,48] cm, stopping when the span explodes (>55 -> deltoid /
+    # merged arm zone) or collapses (<30 -> neck). This is robust to a true
+    # T-pose where the neck-minus-offset heuristic would land in the thin neck.
+    keep_x = levels["keep_x"]
+
+    def _front_xspan(loop):
+        front = loop[loop[:, 2] >= loop[:, 2].mean()]   # front half
+        if len(front) < 2:
+            front = loop
+        fx = front[:, 0]
+        fxc = fx[np.abs(fx) <= keep_x]                   # drop arm excursions
+        if len(fxc) < 2:
+            fxc = fx
+        return float(fxc.max() - fxc.min())
+
+    col_y = levels["neck"] - 6.0                         # heuristic fallback
+    best_y = None
+    for _cy in np.arange(levels["bust"] + 1.0, levels["neck"] + 1.0, 1.0):
+        try:
+            span = _front_xspan(geo.central_loop(mesh, float(_cy)))
+        except Exception:
+            continue
+        if 35.0 <= span <= 48.0:
+            best_y = float(_cy)                           # topmost good level wins
+        elif span > 55.0 or span < 30.0:
+            break
+    if best_y is not None:
+        col_y = best_y
     col_loop = geo.central_loop(mesh, col_y)
     _front = col_loop[col_loop[:, 2] >= col_loop[:, 2].mean()]   # front half
     if len(_front) < 2:
         _front = col_loop
+    _front = _front[np.abs(_front[:, 0]) <= keep_x] if np.any(np.abs(_front[:, 0]) <= keep_x) else _front
     vtx["collar_l"] = _nearest_vertex(mesh, _front[int(np.argmin(_front[:, 0]))])
     vtx["collar_r"] = _nearest_vertex(mesh, _front[int(np.argmax(_front[:, 0]))])
 

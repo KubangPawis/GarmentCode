@@ -64,3 +64,28 @@ def test_derive_full_field_set_on_base():
     assert 40 <= out["leg_circ"] <= 80
     assert 10 <= out["wrist"] <= 25
     assert 10 <= out["neck_w"] <= 25     # PART A fix: no longer the ~1.0 artifact; base body neck_w ~11.7
+
+
+import pytest
+from pathlib import Path as _Path
+
+_GLB = _Path(".temp/avatar_base.glb")
+
+
+@pytest.mark.skipif(not _GLB.exists(), reason="avatar_base.glb absent")
+def test_glb_full_body_in_range_and_ordered():
+    raw = mesh_io.load_body(str(_GLB))
+    mm, _ = mesh_io.normalize(raw)          # auto units -> ~1.729 m
+    cm = mesh_io.to_cm(mm)
+    out = measurements.compute_all(cm, al.derive(cm), arm_pose_angle=0.0)
+    out["height"] = float(cm.bounds[1][1] - cm.bounds[0][1])
+    # the bug was bust=252; assert the whole set is anatomically sane
+    from mpfb_ingest.emit import RANGES
+    for f, (lo, hi) in RANGES.items():
+        assert lo <= out[f] <= hi, f"{f}={out[f]:.1f} out of [{lo},{hi}]"
+    assert out["waist"] < out["underbust"] < out["bust"], \
+        f"ordering: w={out['waist']:.0f} ub={out['underbust']:.0f} b={out['bust']:.0f}"
+    assert out["waist"] < out["hips"]
+    assert out["back_width"] < out["bust"]
+    assert out["waist_back_width"] < out["waist"]
+    assert 165 <= out["height"] <= 178       # measured true glb height (~172.9)
