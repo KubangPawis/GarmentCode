@@ -27,18 +27,21 @@ _DEFAULTS = {
 
 
 def run(obj_path, out_dir, name, landmarks_path, arm_pose_angle,
-        height_m=1.7, save_obj=False, fill_defaults=False):
+        height_m=None, save_obj=False, fill_defaults=False):
+    from mpfb_ingest import autolandmarks
+
     raw = mesh_io.load_body(obj_path)
     mesh_m, report = mesh_io.normalize(raw, expected_height_m=height_m)
     cm = mesh_io.to_cm(mesh_m)
 
-    lm = Landmarks.load(landmarks_path)
-    if lm.n_vertices_expected:
-        lm.validate(cm)
+    if landmarks_path:                      # committed fixed-index path (regression)
+        lm = Landmarks.load(landmarks_path)
+        if lm.n_vertices_expected:
+            lm.validate(cm)
+    else:                                   # topology-agnostic auto path (default)
+        lm = autolandmarks.derive(cm)
 
     measured = measurements.compute_all(cm, lm, arm_pose_angle=arm_pose_angle)
-    # height also comes from compute_all (measurements.distances); reasserted here
-    # so the CLI owns it directly even if the measurement grouping is refactored.
     measured["height"] = float(cm.bounds[1][1] - cm.bounds[0][1])
 
     if fill_defaults:
@@ -49,7 +52,7 @@ def run(obj_path, out_dir, name, landmarks_path, arm_pose_angle,
     if save_obj:
         mesh_io.save_body_obj(mesh_m, out_dir, name)
     print(f"Wrote {out_yaml}  (scale_to_m={report['scale_to_m']:.4f}, "
-          f"verts={report['n_vertices']})")
+          f"verts={report['n_vertices']}, height_cm={measured['height']:.1f})")
     return out_yaml
 
 
@@ -57,12 +60,16 @@ def main():
     ap = argparse.ArgumentParser(description=__doc__)
     ap.add_argument("obj")
     ap.add_argument("--name", required=True)
-    ap.add_argument("--landmarks", required=True)
+    ap.add_argument("--landmarks", default=None,
+                    help="Calibrated vertex-index JSON. Omit for the "
+                         "topology-agnostic auto path (any human mesh).")
     ap.add_argument("--arm-pose-angle", type=float, required=True,
                     help="Arm droop from horizontal (deg). 0 = T-pose (MPFB). "
                          "See mpfb_ingest/README.md.")
     ap.add_argument("--out", default="assets/bodies")
-    ap.add_argument("--height-m", type=float, default=1.7)
+    ap.add_argument("--height-m", type=float, default=None,
+                    help="Override stature in metres. Omit to auto-detect "
+                         "units and measure height from the mesh.")
     ap.add_argument("--save-obj", action="store_true")
     ap.add_argument("--fill-defaults", action="store_true",
                     help="Fill not-yet-calibrated fields with neutral-body values.")

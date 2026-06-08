@@ -25,3 +25,19 @@ def test_cli_run_smoke(tmp_path, monkeypatch):
     data = yaml.safe_load((tmp_path / "avatar.yaml").read_text())["body"]
     assert abs(data["height"] - 170.0) < 3.0
     assert data["arm_pose_angle"] == 90.0
+
+
+from pathlib import Path
+
+
+def test_cli_auto_path_on_real_base(tmp_path):
+    # No --landmarks JSON: the auto (topology-agnostic) path must emit a full
+    # 26-field body with NO --fill-defaults.
+    from ingest_mpfb_body import run
+    out = run("mpfb_ingest/data/mpfb_base_body.obj", out_dir=str(tmp_path),
+              name="auto", landmarks_path=None, arm_pose_angle=0.0,
+              height_m=None, fill_defaults=False)
+    data = yaml.safe_load(Path(out).read_text())["body"]
+    for f in ("waist_back_width", "back_width", "shoulder_w", "arm_length",
+              "bust_points", "leg_circ", "wrist", "neck_w"):
+        assert f in data and data[f] > 0
