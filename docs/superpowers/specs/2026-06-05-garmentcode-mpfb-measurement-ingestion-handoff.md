@@ -1,7 +1,7 @@
 # GarmentCode Body-Measurement & Garment-Parameter Pipeline — Handoff for MPFB Ingestion
 
-**Date:** 2026-06-05
-**Status:** Reference + forward-looking design seed (approach locked)
+**Date:** 2026-06-05 (outcome backfilled 2026-06-08)
+**Status:** Reference design seed — **IMPLEMENTED.** The `mpfb_ingest/` module is built and the quick-pass calibration shipped; an MPFB-derived body generates a garment end-to-end. See **§8** for what was actually built, what changed versus this seed, and which §6 risks are now closed.
 **Audience:** Technical implementer (human or AI agent) with repo access. Anchors are given as `path:line` and class/method names so they survive minor line drift.
 
 ---
@@ -274,3 +274,63 @@ For commercial release, have IP counsel bless the clean-room process and the CGA
 | System paths | `system.json` (`bodies_default_path` = `./assets/bodies`) |
 | Minimal driver (gen only) | `test_garmentcode.py` |
 | Body assets | `assets/bodies/` (`mean_all*.obj/.yaml`, `*_smpl_*`, `ggg_body_segmentation.json`, `smpl_vert_segmentation.json`) |
+
+---
+
+## 8. Implementation outcome (backfilled 2026-06-08)
+
+The design seed above was executed in full. This section records what was actually built, where reality diverged from the seed, and the current state of each §6 risk. Branch: `zeelum/phase0-rnd`. Execution method: `superpowers:subagent-driven-development` (TDD per task; implementer → spec+quality review → fix → commit). Companion plan with full per-task code: `docs/superpowers/plans/2026-06-05-mpfb-body-measurement-ingestion.md`.
+
+### 8.1 What shipped
+
+The 14-task plan (T1–T14) is **complete**; the suite is **24 tests green** (`tests/mpfb_ingest/`). The module matches the §4.4 shape:
+
+| File | Status |
+|---|---|
+| `mpfb_ingest/mesh_io.py` | load OBJ; `normalize()`→metres (Y-up, grounded), `to_cm()`→×100 working copy |
+| `mpfb_ingest/geometry.py` | slice perimeter, slice loops, back-arc, geodesic, euclidean, ΔY, angles |
+| `mpfb_ingest/landmarks.py` | `Landmarks` registry over the index JSON + topology validation |
+| `mpfb_ingest/measurements.py` | the 26-field computations (circumferences / back_widths / distances / angles / `compute_all`) |
+| `mpfb_ingest/emit.py` | range validation + `BodyParameters.load_from_dict(...).save(...)` |
+| `ingest_mpfb_body.py` (root) | CLI orchestration + `--fill-defaults` |
+| `mpfb_ingest/data/mpfb_base_body.obj` | calibrated body-only mesh (13,345 verts, CC0) |
+| `mpfb_ingest/data/makehuman_landmarks.json` | calibrated vertex indices (body-only numbering) |
+| `scripts/calibrate_landmarks.py` | the quick-pass calibrator (§8.3) |
+| `assets/bodies/mpfb_base.yaml` | the generated calibrated body |
+| `mpfb_ingest/README.md` | usage + clean-room provenance + pose convention |
+
+**End-to-end proof:** `mpfb_base.yaml` → `MetaGarment` → a t-shirt pattern generated with no self-intersection (SVG/JSON output). Pattern generation needs only the measurements YAML, as §1/§4.5 predicted.
+
+### 8.2 Divergences from the seed
+
+- **The asset gate dissolved — no user export was ever required.** §4.1/§6 assumed T13–T14 were blocked pending an MPFB-exported OBJ. In fact the MPFB Blender extension **bundles `data/3dobjs/base.obj`** (the MakeHuman hm08 base mesh, 21,833 verts) plus the CC0 `data/targets/measure-*.target.gz` morph regions. Calibration ran against those directly. Path on this machine: `/mnt/c/Users/KubangPawis/AppData/Roaming/Blender Foundation/Blender/5.1/extensions/blender_org/mpfb/data`.
+- **Helper geometry must be stripped first.** The base mesh's body proper is indices `[0, 13380)`; everything at/above is helper geometry (eyes, teeth, tongue, genitals, **joint cubes**). Helpers corrupt the bounding box (and therefore height) and inject stray slice loops into circumferences. The calibrator keeps only faces fully within the body range, compacts the referenced vertices to a fresh `0..N-1` numbering, and commits the result as `mpfb_base_body.obj` (13,345 verts). **All committed landmark indices are in this body-only numbering** — a consumer's raw export must be run through the same strip and checked against `n_vertices_expected` (13345) before its indices are valid.
+- **One plan-authorized edit to shared GarmentCode code.** `pygarment/garmentcode/params.py::BodyParametrizationBase.__init__` now guards `if param_file: self.load(param_file)` so `BodyParameters()` constructs empty for `load_from_dict`. Real-path loading is unchanged.
+- **A false "numpy monkey-patches yaml" diagnosis was caught and reverted in review** (T10). The 3-significant-figure float formatting in emitted YAML is **deliberate and global**, from `pygarment/data_config.py:30` (`yaml.add_representer(float, f'{data:.3g}')`) — every GarmentCode body is formatted this way, so emit preserves it rather than overriding it.
+
+### 8.3 Calibration reality — quick pass, not full fidelity
+
+The seed (§4.3, §6.2) hoped to reuse MakeHuman's measurement vertex data as constant landmarks. Reality:
+
+- **MakeHuman `joint-*` vertex groups are useless for landmarks** — in `base.obj` their helper verts are **parked at the feet** (joint-head/spine sit at Y≈−8), not at anatomical positions.
+- **`measure-*.target.gz` are CC0 morph regions** (`<vertex_index> dx dy dz`), and only the **waist** ring places cleanly. The bust/hips/neck rings are broad deform regions whose extreme-X verts land near the armpits and mis-size the back arc — the bust ring gave `back_width` 24.8 vs reference 47.68, which **degenerates the armscye and crashes sleeve generation** (`AssertionError: Start and end of an edge should differ`).
+
+So the quick pass derives real geometry for **height, waist, bust, underbust, hips, and `waist_back_width`** — the four torso levels via an **anatomical girth scan** (`scripts/calibrate_landmarks.py::_find_levels`: legs merge into pelvis at a crotch girth-jump; hips = max girth just above it; waist = min girth above hips; bust = max girth below the arm-merge jump; underbust = the waist/bust midpoint level), and the waist side-pair from the CC0 waist ring. `waist_back_width` lands 39.9 vs reference 39.14 — validated by `tests/mpfb_ingest/test_calibration_realmesh.py`. **Everything else** (`back_width`, `hip_back_width`, `neck_w`, all geodesic anchors, bust/bum points, limb circumferences) is served by the CLI's `--fill-defaults` (neutral-body values from `mean_all.yaml`) and is the **full-fidelity pass deferred to future work**.
+
+### 8.4 §6 risk status
+
+| # | Risk | Status |
+|---|---|---|
+| 1 | Clean-room discipline | **Held.** Built from the §2.4 PDF definitions; GarmentMeasurements `src/` never read. Deps permissive (trimesh BSD, libigl MPL2, numpy/scipy BSD). |
+| 2 | Landmark calibration | **Partially closed.** Torso levels + waist pair are real and validated; remaining anchors are defaulted (§8.3). Full-fidelity calibration is the main open item. |
+| 3 | `arm_pose_angle` convention | **Closed.** It is arm droop from horizontal: **T-pose = 0.0**, *not* 90. Pinned by `mean_all_tpose.yaml` being byte-identical to `mean_all.yaml` except 45.483→0.0. Consumed at `sleeves.py:340` (Z-rotation) and `bodice.py:297` (`gap = -1 - arm_pose_angle/10`). Pass `--arm-pose-angle 0` for MPFB. |
+| 4 | T-pose vs A-pose drafting | **Closed for generation.** `arm_pose_angle=0` generates cleanly; the earlier crash was the bad `back_width`, not the pose. Draping under T-pose is untested (draping is out of scope, §4.5). |
+| 5 | Units / orientation | **Closed.** `normalize()` grounds to metres with an `expected_height_m` sanity check; `to_cm()` drives all measurement math. |
+| 6 | Segmentation gotcha | **Unchanged / still open.** Sibling draping workstream, untouched by this module. |
+| 7 | Validation strategy | **In place.** Synthetic-fixture tests (T1–T12) plus the real-mesh anatomical-range + ordering test (T13). Cross-check against MPFB Measure-tab readouts still pending a user avatar. |
+
+### 8.5 Remaining work (deferred, not started)
+
+1. **Full-fidelity anchor pass** — replace `--fill-defaults` for `back_width`, `hip_back_width`, `neck_w`, the geodesic distances (`waist_line`, `waist_over_bust_line`, `bust_line`, `arm_length`), and the bust/bum point pairs with real geometry. Requires reliable side-balance and nape/crown/collarbone landmarks the broad measure rings don't provide.
+2. **Consumer-export validation** — confirm a real user MPFB export's topology matches `n_vertices_expected` (13345) after the same body-only strip, or recalibrate if it differs (subdivision/proxies change the count). Wire the strip into the CLI so raw exports work directly.
+3. **Draping** — body OBJ (`--save-obj`) is emitted, but the body-segmentation JSON + the `PathCofig.body_seg` un-hardcoding (§4.5) remain the sibling workstream.
