@@ -34,6 +34,8 @@ def test_derive_circumferences_and_backwidths():
     assert out["waist_back_width"] < out["waist"]
     assert out["back_width"] < out["bust"]
     assert out["hip_back_width"] < out["hips"]
+    assert 78 <= out["bust"] <= 98          # validated ~86 (regression guard)
+    assert 30 <= out["back_width"] <= 55     # validated geometric ~36
     # bust/bum point spreads are plausible peak-to-peak distances
     assert 10.0 <= out["bust_points"] <= 30.0
     assert 10.0 <= out["bum_points"] <= 35.0

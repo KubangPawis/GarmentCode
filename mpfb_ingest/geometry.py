@@ -38,51 +38,6 @@ def slice_perimeter(mesh, y, pick="longest", point=None):
     return max(_loop_perimeter(L) for L in loops)
 
 
-def central_loop(mesh, y, min_perimeter=8.0):
-    """Section loop straddling the body axis at height y (arms/legs excluded).
-
-    A horizontal cut through a T-pose body yields the torso loop plus separate
-    side loops for any arm/leg it grazes, and occasionally tiny degenerate
-    interior loops (skull cavity, mouth). The torso / outer-body loop is
-    identified in two steps:
-
-    1. Keep only substantial loops (perimeter >= min_perimeter); fall back to
-       all loops when none qualify.
-    2. Among substantial loops, separate "central" ones (|mean X| within the
-       lower half of the range) from "limb" ones that are far off-axis.
-       Among central loops pick the LARGEST perimeter — that is always the
-       outer body surface; interior cavities (skull, mouth) are smaller loops
-       contained within it.  If no limb loops exist (only one or two loops
-       near the axis), use the largest perimeter among all substantial loops.
-
-    Returns the ordered (N,3) polyline.
-    """
-    loops = slice_loops(mesh, y)
-    if not loops:
-        raise ValueError(f"No cross-section at y={y}")
-    substantial = [L for L in loops if _loop_perimeter(L) >= min_perimeter]
-    pool = substantial if substantial else loops
-
-    # Compute |mean X| for each substantial loop.
-    abs_mx = [abs(float(np.mean(L[:, 0]))) for L in pool]
-    mx_max = max(abs_mx) if abs_mx else 0.0
-
-    # "Central" loops: |mean X| <= half the max off-axis value seen, OR all
-    # loops are near the axis (mx_max small — no limb loops in this slice).
-    threshold = max(0.5 * mx_max, 1e-6)
-    central = [L for L, mx in zip(pool, abs_mx) if mx <= threshold]
-    if not central:
-        central = pool
-
-    # Among central loops, the outer body surface has the LARGEST perimeter.
-    return max(central, key=_loop_perimeter)
-
-
-def central_perimeter(mesh, y):
-    """Perimeter (cm) of the central torso loop at height y (arm-excluded)."""
-    return _loop_perimeter(central_loop(mesh, y))
-
-
 def torso_halfwidth(mesh):
     """Robust torso half-width (cm): the 97th-percentile |X| over the mid-lower
     body band, where a T-pose has no arms (arms sit at shoulder height)."""
@@ -91,6 +46,37 @@ def torso_halfwidth(mesh):
     band = (V[:, 1] > 0.30 * top) & (V[:, 1] < 0.52 * top)
     xs = np.abs(V[band, 0]) if band.any() else np.abs(V[:, 0])
     return float(np.percentile(xs, 97))
+
+
+def central_loop(mesh, y, keep_x=None):
+    """Section loop straddling the body axis at height y, with arm/leg excursions
+    excluded. First pick the loop whose mean X is nearest the body axis (x~=0);
+    then clip points with |X| > keep_x (the arms) and bridge the armpit gaps, so
+    a T-pose arm that merges into the torso loop is excluded. keep_x defaults to
+    1.6 * torso_halfwidth(mesh). Returns the ordered (N,3) polyline.
+    """
+    loops = slice_loops(mesh, y)
+    if not loops:
+        raise ValueError(f"No cross-section at y={y}")
+    substantial = [L for L in loops if _loop_perimeter(L) >= 8.0]
+    pool = substantial if substantial else loops
+    abs_mx = [abs(float(np.mean(L[:, 0]))) for L in pool]
+    mx_max = max(abs_mx) if abs_mx else 0.0
+    threshold = max(0.5 * mx_max, 1e-6)
+    central = [L for L, mx in zip(pool, abs_mx) if mx <= threshold] or pool
+    loop = max(central, key=_loop_perimeter)
+
+    if keep_x is None:
+        keep_x = 1.6 * torso_halfwidth(mesh)
+    mask = np.abs(loop[:, 0]) <= keep_x
+    if mask.any() and not mask.all():
+        loop = loop[mask]
+    return loop
+
+
+def central_perimeter(mesh, y):
+    """Perimeter (cm) of the central torso loop at height y (arm-excluded)."""
+    return _loop_perimeter(central_loop(mesh, y))
 
 
 def torso_perimeter(mesh, y, keep_x):

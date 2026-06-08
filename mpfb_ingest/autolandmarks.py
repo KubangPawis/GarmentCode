@@ -56,13 +56,23 @@ def find_levels(mesh):
     if crotch is None:
         crotch = 0.45 * top
 
-    # arm zone: lowest height in the upper body where the FULL girth exceeds the
-    # clipped girth by >50% (an arm has entered the slice). Cap torso bands below.
+    # arm/shoulder shelf: the lowest upper-body height where EITHER the full
+    # girth balloons over the clipped girth (a true T-pose arm has merged into
+    # the slice, e.g. the glb) OR the clipped girth itself jumps sharply (the
+    # shoulder shelf / deltoids enter the section, as on an angled-arm base
+    # mesh whose arms never form one merged loop). Cap the torso bands below
+    # this so the bust is never placed on the shoulders.
     with np.errstate(divide="ignore", invalid="ignore"):
         ratio = gf / np.where(gc > 1.0, gc, np.nan)
     arm_merge = None
-    for y, r in zip(ys, ratio):
-        if crotch + 30.0 <= y <= 0.9 * top and np.isfinite(r) and r > 1.5:
+    for i, y in enumerate(ys):
+        if not (crotch + 30.0 <= y <= 0.9 * top):
+            continue
+        j = i - 4
+        spiked = np.isfinite(ratio[i]) and ratio[i] > 1.4
+        jumped = (j >= 0 and np.isfinite(gc[i]) and np.isfinite(gc[j])
+                  and gc[j] > 1.0 and gc[i] > 1.22 * gc[j])
+        if spiked or jumped:
             arm_merge = float(y)
             break
     if arm_merge is None:
@@ -70,12 +80,15 @@ def find_levels(mesh):
 
     hy, hg = band(gc, crotch + 1.0, crotch + 18.0)
     hips = float(hy[np.argmax(hg)])
-    # bust: widest clipped girth between the hips and just below the arm zone.
-    by, bg = band(gc, hips + 10.0, arm_merge - 3.0)
-    bust = float(by[np.argmax(bg)]) if len(by) else (hips + 0.25 * (arm_merge - hips))
-    # waist: narrowest clipped girth between the hips and the bust.
-    wy, wg = band(gc, hips + 5.0, bust - 3.0)
-    waist = float(wy[np.argmin(wg)]) if len(wy) else (0.5 * (hips + bust))
+    # waist: narrowest clipped girth between the hips and the arm zone. A slim
+    # body's hips AND chest can both exceed the waist, so the waist is the MIN
+    # here -- it must NOT be derived relative to a "max girth" bust (which on
+    # such a body lands on the wider hips).
+    wy, wg = band(gc, hips + 5.0, arm_merge - 5.0)
+    waist = float(wy[np.argmin(wg)]) if len(wy) else (hips + 0.3 * (arm_merge - hips))
+    # bust: widest clipped girth ABOVE the waist, just below the arm zone.
+    by, bg = band(gc, waist + 5.0, arm_merge - 2.0)
+    bust = float(by[np.argmax(bg)]) if len(by) else (0.5 * (waist + arm_merge))
     underbust = 0.5 * (waist + bust)
     # neck: narrowest clipped girth ABOVE the arm zone (true neck, no skull loop).
     ny, ng = band(gc, arm_merge + 3.0, 0.95 * top)
