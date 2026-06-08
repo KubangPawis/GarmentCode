@@ -38,6 +38,25 @@ def slice_perimeter(mesh, y, pick="longest", point=None):
     return max(_loop_perimeter(L) for L in loops)
 
 
+def central_loop(mesh, y):
+    """Section loop straddling the body axis at height y (arms/legs excluded).
+
+    A horizontal cut through a T-pose body yields the torso loop plus separate
+    side loops for any arm/leg it grazes. The torso loop is the one whose mean X
+    sits nearest the body's central axis (x~=0); limb loops sit far out in +/-X.
+    Returns the ordered (N,3) polyline.
+    """
+    loops = slice_loops(mesh, y)
+    if not loops:
+        raise ValueError(f"No cross-section at y={y}")
+    return min(loops, key=lambda L: abs(float(np.mean(L[:, 0]))))
+
+
+def central_perimeter(mesh, y):
+    """Perimeter (cm) of the central torso loop at height y (arm-excluded)."""
+    return _loop_perimeter(central_loop(mesh, y))
+
+
 def euclidean(p, q):
     return float(np.linalg.norm(np.asarray(p, float) - np.asarray(q, float)))
 
