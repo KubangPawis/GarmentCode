@@ -7,7 +7,7 @@ from . import geometry as geo
 
 
 def circumferences(mesh, lm, level_y=None):
-    """waist, bust, underbust, hips (longest loop) + wrist, leg_circ (nearest limb).
+    """waist, bust, underbust, hips (arm-excluded central loop) + wrist, leg_circ (nearest limb).
 
     Fields whose level is not available are skipped (a later task fills the gaps).
     """
@@ -21,7 +21,7 @@ def circumferences(mesh, lm, level_y=None):
         y = ly(field)
         if y is None:
             continue
-        out[field] = geo.slice_perimeter(mesh, y, pick="longest")
+        out[field] = geo.central_perimeter(mesh, y)
     if "wrist_r" in lm.vertices and ly("wrist") is not None:
         p = lm.point(mesh, "wrist_r")
         out["wrist"] = geo.slice_perimeter(mesh, ly("wrist"), pick="nearest",
