@@ -12,20 +12,37 @@ def load_body(path) -> trimesh.Trimesh:
     return obj
 
 
-def normalize(mesh: trimesh.Trimesh, expected_height_m: float = 1.7) -> tuple[trimesh.Trimesh, dict]:
+def detect_scale_to_m(raw_height: float) -> float:
+    """Factor to bring a raw Y-extent to metres, by magnitude bucket.
+
+    ~1-3 -> already metres (x1); ~10-25 -> decimetres (x0.1);
+    >50 -> centimetres / MakeHuman raw units (x0.01). Mid-gaps fall to the
+    nearest plausible human bucket.
+    """
+    if raw_height <= 0:
+        raise ValueError("Mesh has zero Y-extent; is it Y-up?")
+    if raw_height < 4.0:
+        return 1.0
+    if raw_height < 40.0:
+        return 0.1
+    return 0.01
+
+
+def normalize(mesh: trimesh.Trimesh, expected_height_m: float | None = None) -> tuple[trimesh.Trimesh, dict]:
     """Return (mesh_in_metres, report).
 
-    Steps: detect unit scale from total Y-extent vs expected human height,
-    scale to metres, centre X/Z on the axis-aligned bounding-box midpoint,
-    ground feet to Y=0. Bounding-box midpoint (not mass centroid) is used so
-    centring is deterministic and independent of mesh density/asymmetry.
-    Assumes the mesh is already Y-up (MakeHuman default).
+    Auto-detects the unit scale and MEASURES true height. Pass
+    `expected_height_m` only to force a known stature (override). Then centre
+    X/Z on the bbox midpoint and ground feet to Y=0. Assumes Y-up.
     """
     mesh = mesh.copy()
     raw_height = float(mesh.bounds[1][1] - mesh.bounds[0][1])
     if raw_height <= 0:
         raise ValueError("Mesh has zero Y-extent; is it Y-up?")
-    scale_to_m = expected_height_m / raw_height
+    if expected_height_m is not None:
+        scale_to_m = expected_height_m / raw_height
+    else:
+        scale_to_m = detect_scale_to_m(raw_height)
     mesh.apply_scale(scale_to_m)
 
     (x0, _, z0), (x1, _, z1) = mesh.bounds
