@@ -37,3 +37,28 @@ def test_derive_circumferences_and_backwidths():
     # bust/bum point spreads are plausible peak-to-peak distances
     assert 10.0 <= out["bust_points"] <= 30.0
     assert 10.0 <= out["bum_points"] <= 35.0
+
+
+def test_derive_full_field_set_on_base():
+    cm = _base_cm()
+    lm = al.derive(cm)
+    out = measurements.compute_all(cm, lm, arm_pose_angle=0.0)
+    required = {
+        "height", "bust", "waist", "hips", "underbust",
+        "waist_back_width", "back_width", "hip_back_width", "neck_w",
+        "shoulder_w", "head_l", "bust_points", "bum_points", "armscye_depth",
+        "arm_length", "waist_line", "bust_line", "waist_over_bust_line",
+        "hips_line", "crotch_hip_diff", "vert_bust_line",
+        "leg_circ", "wrist", "shoulder_incl", "hip_inclination", "arm_pose_angle",
+    }
+    missing = required - set(out)
+    assert not missing, f"missing geometric fields: {sorted(missing)}"
+    # sane ranges for a ~170 cm body
+    assert 25 <= out["shoulder_w"] <= 55
+    assert 20 <= out["head_l"] <= 32
+    assert 40 <= out["arm_length"] <= 75
+    assert 0 <= out["shoulder_incl"] <= 45
+    assert 0 <= out["hip_inclination"] <= 45
+    assert 40 <= out["leg_circ"] <= 80
+    assert 10 <= out["wrist"] <= 25
+    assert 10 <= out["neck_w"] <= 25     # PART A fix: no longer the ~1.0 artifact; base body neck_w ~11.7

@@ -38,18 +38,44 @@ def slice_perimeter(mesh, y, pick="longest", point=None):
     return max(_loop_perimeter(L) for L in loops)
 
 
-def central_loop(mesh, y):
+def central_loop(mesh, y, min_perimeter=8.0):
     """Section loop straddling the body axis at height y (arms/legs excluded).
 
     A horizontal cut through a T-pose body yields the torso loop plus separate
-    side loops for any arm/leg it grazes. The torso loop is the one whose mean X
-    sits nearest the body's central axis (x~=0); limb loops sit far out in +/-X.
+    side loops for any arm/leg it grazes, and occasionally tiny degenerate
+    interior loops (skull cavity, mouth). The torso / outer-body loop is
+    identified in two steps:
+
+    1. Keep only substantial loops (perimeter >= min_perimeter); fall back to
+       all loops when none qualify.
+    2. Among substantial loops, separate "central" ones (|mean X| within the
+       lower half of the range) from "limb" ones that are far off-axis.
+       Among central loops pick the LARGEST perimeter — that is always the
+       outer body surface; interior cavities (skull, mouth) are smaller loops
+       contained within it.  If no limb loops exist (only one or two loops
+       near the axis), use the largest perimeter among all substantial loops.
+
     Returns the ordered (N,3) polyline.
     """
     loops = slice_loops(mesh, y)
     if not loops:
         raise ValueError(f"No cross-section at y={y}")
-    return min(loops, key=lambda L: abs(float(np.mean(L[:, 0]))))
+    substantial = [L for L in loops if _loop_perimeter(L) >= min_perimeter]
+    pool = substantial if substantial else loops
+
+    # Compute |mean X| for each substantial loop.
+    abs_mx = [abs(float(np.mean(L[:, 0]))) for L in pool]
+    mx_max = max(abs_mx) if abs_mx else 0.0
+
+    # "Central" loops: |mean X| <= half the max off-axis value seen, OR all
+    # loops are near the axis (mx_max small — no limb loops in this slice).
+    threshold = max(0.5 * mx_max, 1e-6)
+    central = [L for L, mx in zip(pool, abs_mx) if mx <= threshold]
+    if not central:
+        central = pool
+
+    # Among central loops, the outer body surface has the LARGEST perimeter.
+    return max(central, key=_loop_perimeter)
 
 
 def central_perimeter(mesh, y):
@@ -79,15 +105,29 @@ def angle_to_vertical(p, q):
 
 
 def geodesic(mesh, src_idx, dst_idx):
-    """Exact surface geodesic distance between two vertex indices (cm)."""
+    """Exact surface geodesic distance between two vertex indices (cm).
+
+    Falls back to Euclidean when the two vertices are on different connected
+    components (igl returns 0 for such pairs).
+    """
     v = np.ascontiguousarray(mesh.vertices, dtype=np.float64)
     f = np.ascontiguousarray(mesh.faces, dtype=np.int64)
+    _empty = np.array([], dtype=np.int64)
     d = igl.exact_geodesic(
         v, f,
         VS=np.array([src_idx], dtype=np.int64),
+        FS=_empty,
         VT=np.array([dst_idx], dtype=np.int64),
+        FT=_empty,
     )
-    return float(np.atleast_1d(d)[0])
+    result = float(np.atleast_1d(d)[0])
+    # igl returns 0 when src == dst OR when vertices are on different mesh
+    # components (disconnected islands).  Detect the latter by comparing to the
+    # Euclidean distance: if the geodesic is suspiciously small relative to the
+    # straight-line gap, fall back to Euclidean as the best available estimate.
+    if result < 1e-6 and src_idx != dst_idx:
+        result = euclidean(v[src_idx], v[dst_idx])
+    return result
 
 
 def arc_between(loop, a, b, side="back", back_sign=-1.0):
