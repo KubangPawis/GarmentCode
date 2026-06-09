@@ -172,6 +172,16 @@ Skipped automatically unless CUDA is available:
 .venv/bin/python -m pytest tests/mpfb_drape/test_end_to_end.py -v
 ```
 
+## Drape variance
+
+GPU cloth simulation is non-deterministic: a given design may settle at slightly
+different body-penetration counts from run to run, so a per-design verdict in the
+wardrobe manifest may occasionally FAIL on a design that passes on a re-run. If a
+design fails, re-running `drape_one` (or re-invoking the CLI) is sufficient to
+recover an accepted drape in most cases. As a documented future enhancement, the
+wardrobe driver (`drape_wardrobe`) could auto-retry failed designs rather than
+requiring a manual re-drape.
+
 ## Known limitations / future work
 
 - **Combined dressed-avatar GLB** (garment + body merged into a single file) — the
