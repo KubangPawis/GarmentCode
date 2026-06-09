@@ -2,7 +2,7 @@
 
 **Date:** 2026-06-09
 **Branch:** `worktree-zeelum+mpfb-tpose-normalize` (worktree off `main` @ f81f1ee)
-**Status:** Approved design, pending spec review → implementation plan
+**Status:** Implemented — geometry units (22) + gated end-to-end T-pose verification (2 presets) green; full suite 59 passed / 13 skipped, no `mpfb_ingest` regression. Measured: MPFB default arm droop ≈43° → 0° after normalize.
 
 ## 1. Problem & Context
 
