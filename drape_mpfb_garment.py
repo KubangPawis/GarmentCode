@@ -42,7 +42,7 @@ def main(argv=None):
         ap.error(f"no design YAMLs found in: {a.designs}")
 
     man = pipeline.drape_wardrobe(
-        body_yaml, body_obj, a.designs, out_dir=a.out,
+        body_yaml, body_obj, designs, out_dir=a.out,
         sim_props_yaml=a.sim_props, bodies_dir=a.bodies_dir, render=a.render)
 
     s = man["summary"]
