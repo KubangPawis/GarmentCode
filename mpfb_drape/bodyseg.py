@@ -51,46 +51,31 @@ def segment_by_thresholds(vertices, arm_x, crotch_y):
     }
 
 
-def derive_thresholds(vertices):
-    """Estimate (arm_x, crotch_y) geometrically from a T-pose mesh.
+def derive_thresholds(vertices, arm_margin=1.6):
+    """Estimate (arm_x, crotch_y) geometrically from a true T-pose mesh.
 
-    arm_x: largest gap in sorted |X| over the upper half (torso vs arms).
+    arm_x: torso half-width (P97 of |X| in a band BELOW the armpit, where a
+        T-pose has no lateral arms) times a margin. Vertices with |X| beyond
+        this are arms. On an arms-down / non-T-pose body the band already
+        spans the arms, so torso_hw ~= max|X| and arm_x exceeds it -> no arms
+        detected (correct: such a body has no laterally separable arms).
     crotch_y: half the stature above the ground.
+
+    Note: this is the topology-agnostic geometric heuristic; it relies on the
+    mpfb_drape contract that the body is a true T-pose (arm_pose_angle ~= 0).
     """
     v = np.asarray(vertices, dtype=float)
     y = v[:, 1]
     ymin, ymax = float(y.min()), float(y.max())
     height = ymax - ymin
 
-    upper = v[y > ymin + 0.5 * height]
-    ax = np.sort(np.abs(upper[:, 0]))
-    if ax.size >= 2:
-        gaps = np.diff(ax)
-        gi = int(np.argmax(gaps))
-
-        # The largest gap may land INTERIOR to a sparse arm region (two large gaps
-        # in sequence, the preceding one being the true torso/arm boundary). In a
-        # sorted array this is equivalent to checking whether gaps[gi-1] is
-        # substantial. Find the last value strictly below ax[gi]:
-        left_val = ax[gi]
-        lo = gi
-        while lo > 0 and ax[lo] >= left_val:
-            lo -= 1
-        prev_gap = left_val - ax[lo]
-
-        # 0.5% of height = a gap large enough to be a real anatomical separation
-        small_thresh = 0.005 * height
-        if prev_gap > small_thresh:
-            # Largest gap is arm-interior; the real boundary is this preceding gap
-            arm_x = float(0.5 * (ax[lo] + left_val))
-        elif gaps[gi] > 0.05 * height:
-            # No preceding gap; the largest gap IS the torso/arm boundary
-            arm_x = float(0.5 * (ax[gi] + ax[gi + 1]))
-        else:
-            arm_x = float(ax[-1]) * 1.5  # no separated arms found laterally
+    band = v[(y >= ymin + 0.50 * height) & (y <= ymin + 0.68 * height)]
+    if len(band):
+        torso_hw = float(np.percentile(np.abs(band[:, 0]), 97))
     else:
-        arm_x = float(np.abs(v[:, 0]).max()) * 1.5
+        torso_hw = float(np.abs(v[:, 0]).max())
 
+    arm_x = torso_hw * arm_margin
     crotch_y = ymin + 0.5 * height
     return arm_x, crotch_y
 
@@ -99,6 +84,11 @@ def build_segmentation(vertices):
     """Full pipeline: derive thresholds, then partition into ggg regions."""
     arm_x, crotch_y = derive_thresholds(vertices)
     return segment_by_thresholds(vertices, arm_x, crotch_y)
+
+
+def arms_detected(seg):
+    """True if the segmentation found lateral arms (a true-T-pose property)."""
+    return bool(seg.get("left_arm")) or bool(seg.get("right_arm"))
 
 
 def write_segmentation(seg, path):

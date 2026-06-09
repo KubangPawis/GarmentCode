@@ -1,6 +1,10 @@
 import json
+from pathlib import Path
 import numpy as np
+import trimesh
 from mpfb_drape import bodyseg
+
+REPO = Path(__file__).resolve().parents[2]
 
 GGG_KEYS = {"body", "left_arm", "right_arm", "left_leg", "right_leg", "face_internal"}
 
@@ -45,27 +49,12 @@ def test_indices_in_range_and_face_internal_empty(tpose_cm):
         assert all(isinstance(i, int) for i in seg[k])
 
 
-def test_derive_thresholds_finds_arm_gap(tpose_cm):
-    v = np.asarray(tpose_cm.vertices)
-    arm_x, crotch_y = bodyseg.derive_thresholds(v)
-    # torso half-width is 16, arms start at 17 -> the cut sits in (16, 17)
-    assert 16.0 <= arm_x <= 17.0
-    # crotch at half height (~86 cm for this ~172 cm humanoid)
-    assert 70.0 < crotch_y < 100.0
-
-
-def test_derive_then_segment_matches_geometry(tpose_cm):
-    v = np.asarray(tpose_cm.vertices)
-    arm_x, crotch_y = bodyseg.derive_thresholds(v)
-    seg = bodyseg.segment_by_thresholds(v, arm_x, crotch_y)
-    assert seg["right_arm"] and seg["left_arm"]
-    assert all(v[i, 0] > arm_x for i in seg["right_arm"])
-
-
-def test_build_segmentation_from_mesh(tpose_cm):
-    seg = bodyseg.build_segmentation(np.asarray(tpose_cm.vertices))
+def test_build_segmentation_from_mesh():
+    m = trimesh.load(str(REPO / "assets/bodies/mean_all_tpose.obj"),
+                     process=False, force="mesh")
+    seg = bodyseg.build_segmentation(np.asarray(m.vertices))
     assert set(seg) == GGG_KEYS
-    assert seg["right_arm"] and seg["left_leg"]
+    assert seg["right_arm"] and seg["left_arm"] and seg["left_leg"]
 
 
 def test_write_segmentation_json_shape(tpose_cm, tmp_path):
@@ -75,3 +64,35 @@ def test_write_segmentation_json_shape(tpose_cm, tmp_path):
     loaded = json.loads(out.read_text())
     assert set(loaded) == GGG_KEYS
     assert all(isinstance(i, int) for i in loaded["body"])
+
+
+def test_derive_detects_arms_on_real_tpose():
+    v = np.asarray(trimesh.load(str(REPO / "assets/bodies/mean_all_tpose.obj"),
+                                process=False, force="mesh").vertices)
+    arm_x, crotch_y = bodyseg.derive_thresholds(v)
+    assert arm_x < np.abs(v[:, 0]).max()       # arms ARE laterally separable
+    seg = bodyseg.segment_by_thresholds(v, arm_x, crotch_y)
+    assert seg["left_arm"] and seg["right_arm"]
+    assert bodyseg.arms_detected(seg)
+
+
+def test_arms_empty_on_arms_down_body():
+    # mean_all.obj is a neutral/arms-down body: arms are not laterally separable
+    v = np.asarray(trimesh.load(str(REPO / "assets/bodies/mean_all.obj"),
+                                process=False, force="mesh").vertices)
+    seg = bodyseg.build_segmentation(v)
+    assert seg["left_arm"] == [] and seg["right_arm"] == []
+    assert not bodyseg.arms_detected(seg)
+
+
+def test_tpose_regions_form_complete_faces():
+    # every non-empty region must form >=1 complete face, else Warp's
+    # extract_submesh hits np.vectorize size-0 and crashes
+    m = trimesh.load(str(REPO / "assets/bodies/mean_all_tpose.obj"),
+                     process=False, force="mesh")
+    v = np.asarray(m.vertices); faces = np.asarray(m.faces)
+    seg = bodyseg.build_segmentation(v)
+    for k in ("body", "left_arm", "right_arm", "left_leg", "right_leg"):
+        if seg[k]:
+            s = set(seg[k])
+            assert any(all(int(i) in s for i in f) for f in faces), f"{k}: no complete face"
