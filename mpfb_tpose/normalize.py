@@ -1,5 +1,7 @@
 """Orchestrates the 12-step manual T-pose procedure on a live MPFB human (runs
 inside Blender). Pure sequencing + guards; math is in geometry, rig ops in rig."""
+import math
+
 import bpy
 from . import rig as rigmod
 
@@ -33,7 +35,7 @@ def _apply_armature_modifier(mesh):
 
 def _lateral_span(mesh):
     xs = [v.co.x for v in mesh.data.vertices]
-    return max(xs) - min(xs)
+    return max(xs, default=0.0) - min(xs, default=0.0)
 
 
 def normalize_human(basemesh, human_svc, rig_svc, *, fallback_deg=45.0):
@@ -61,5 +63,5 @@ def normalize_human(basemesh, human_svc, rig_svc, *, fallback_deg=45.0):
     print("TPOSE span %.3f -> %.3f units (x%.2f); angles_deg=%s"
           % (pre_span, post_span,
              (post_span / pre_span if pre_span else 0.0),
-             {s: round(__import__("math").degrees(a), 1) for s, a in angles.items()}))
+             {s: round(math.degrees(a), 1) for s, a in angles.items()}))
     return {"pre_span": pre_span, "post_span": post_span, "angles": angles}
