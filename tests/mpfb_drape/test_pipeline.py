@@ -2,7 +2,7 @@ from pathlib import Path
 import pytest
 from mpfb_drape import pipeline
 
-REPO = Path("/home/kubangpawis/dev/GarmentCode/.claude/worktrees/feat+mpfb-drape")
+REPO = Path(__file__).resolve().parents[2]
 DEFAULT_SIM = REPO / "assets/Sim_props/default_sim_props.yaml"
 
 
@@ -118,3 +118,13 @@ def test_drape_one_rejects_arms_down_body(tmp_path):
     assert not (bodies / "_mpfbdrape_mean_all.obj").exists()
     assert not (bodies / "_mpfbdrape_mean_all.yaml").exists()
     assert not (bodies / "_mpfbdrape_mean_all_bodyseg.json").exists()
+
+
+def test_mpfb_drape_preset_loads_with_expected_thresholds():
+    # The production CLI default preset must load and carry the avatar-dressing
+    # collision margins (guards a regression that the gated GPU test can't catch).
+    props = pipeline.make_sim_props(REPO / "assets/Sim_props/mpfb_drape_sim_props.yaml")
+    cfg = props["sim"]["config"]
+    assert cfg["max_body_collisions"] == 50
+    assert cfg["optimize_storage"] is False
+    assert cfg["options"]["body_collision_thickness"] == 1.0

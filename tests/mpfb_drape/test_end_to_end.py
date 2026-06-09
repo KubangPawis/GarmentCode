@@ -2,7 +2,7 @@ from pathlib import Path
 import yaml
 import pytest
 
-REPO = Path("/home/kubangpawis/dev/GarmentCode/.claude/worktrees/feat+mpfb-drape")
+REPO = Path(__file__).resolve().parents[2]
 
 
 def _cuda_available():
@@ -35,8 +35,7 @@ def test_end_to_end_drape_tshirt(tmp_path):
 
     try:
         res = pipeline.drape_one(
-            body_yaml, body_obj, design, out_dir=tmp_path / "out",
-            bodies_dir=bodies, name="tee",
+            body_yaml, body_obj, design, out_dir=tmp_path / "out", name="tee",
             sim_props_yaml=REPO / "assets/Sim_props/mpfb_drape_sim_props.yaml")
         assert Path(res["sim_obj"]).exists()
         assert res["verdict"]["passed"], res["verdict"]["reasons"]

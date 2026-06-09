@@ -2,7 +2,7 @@ import importlib.util
 from pathlib import Path
 import pytest
 
-REPO = Path("/home/kubangpawis/dev/GarmentCode/.claude/worktrees/feat+mpfb-drape")
+REPO = Path(__file__).resolve().parents[2]
 
 
 def _load_cli():

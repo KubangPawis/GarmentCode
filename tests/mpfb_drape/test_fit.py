@@ -3,7 +3,7 @@ import yaml
 import pytest
 from mpfb_drape import fit
 
-REPO = Path("/home/kubangpawis/dev/GarmentCode/.claude/worktrees/feat+mpfb-drape")
+REPO = Path(__file__).resolve().parents[2]
 
 
 @pytest.fixture
