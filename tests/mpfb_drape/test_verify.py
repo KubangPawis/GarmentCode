@@ -64,3 +64,17 @@ def test_fail_on_flyaway_bbox(tiny_obj, tmp_path):
     v = verify.acceptance(_stats("g"), "g", tiny_obj, body, 35, 300)
     assert v["passed"] is False
     assert any("bbox" in r or "outside" in r for r in v["reasons"])
+
+
+def test_fail_on_self_penetration(tiny_obj, tmp_path):
+    body = _body_obj(tmp_path)
+    v = verify.acceptance(_stats("g", self_=999), "g", tiny_obj, body, 35, 300)
+    assert v["passed"] is False
+    assert any("self" in r for r in v["reasons"])
+
+
+def test_fail_on_missing_obj(tmp_path):
+    body = _body_obj(tmp_path)
+    v = verify.acceptance(_stats("g"), "g", tmp_path / "nonexistent.obj", body, 35, 300)
+    assert v["passed"] is False
+    assert "sim_obj_missing" in v["reasons"]
