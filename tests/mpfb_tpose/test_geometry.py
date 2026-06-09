@@ -19,13 +19,15 @@ def test_rotate_about_y_quarter_turn():
 
 
 @pytest.mark.parametrize("side", ["l", "r"])
-@pytest.mark.parametrize("deg", [10.0, 30.0, 45.0, 60.0])
+@pytest.mark.parametrize("deg", [-20.0, 10.0, 30.0, 45.0, 60.0, 89.0])
 def test_rotation_brings_arm_horizontal(side, deg):
+    # deg<0 is an upward-pointing arm, deg=89 a near-vertical arm: both must
+    # still land horizontal on the correct side.
     sh, wr = _drooped(side, deg)
     phi = g.y_rotation_to_horizontal(sh, wr)
     out = g.rotate_about_y(wr - sh, phi)
-    assert abs(out[2]) < 1e-9                          # z -> 0 (horizontal)
-    assert np.sign(out[0]) == np.sign((wr - sh)[0])    # lateral side preserved
+    assert abs(out[2]) < 1e-9                  # z -> 0 (horizontal)
+    assert out[0] * (wr - sh)[0] > 0           # lateral side preserved (both nonzero)
 
 
 @pytest.mark.parametrize("side", ["l", "r"])
@@ -55,4 +57,16 @@ def test_fallback_brings_canonical_arm_horizontal(side):
     v = np.array([sx * np.cos(np.radians(45)), 0.0, -np.sin(np.radians(45))])
     out = g.rotate_about_y(v, phi)
     assert abs(out[2]) < 1e-9
-    assert np.sign(out[0]) == sx
+    assert out[0] * sx > 0
+
+
+def test_coincident_shoulder_wrist_raises():
+    with pytest.raises(ValueError):
+        g.y_rotation_to_horizontal([1.0, 2.0, 3.0], [1.0, 2.0, 3.0])
+
+
+def test_fallback_rejects_invalid_side():
+    with pytest.raises(ValueError):
+        g.fallback_y_rotation("L", 45.0)
+    with pytest.raises(ValueError):
+        g.fallback_y_rotation("right", 45.0)

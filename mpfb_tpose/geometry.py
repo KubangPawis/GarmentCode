@@ -18,12 +18,15 @@ def rotate_about_y(vec, angle):
 def y_rotation_to_horizontal(shoulder, wrist):
     """Signed rotation (radians) about world +Y that brings the shoulder->wrist
     vector into the horizontal (z=0) plane while preserving the arm's lateral
-    side (sign of x). Per-side sign is derived from the geometry, not hardcoded."""
+    side (sign of x). Per-side sign is derived from the geometry, not hardcoded.
+    Raises ValueError if shoulder and wrist coincide (no arm direction)."""
     v = np.asarray(wrist, dtype=np.float64) - np.asarray(shoulder, dtype=np.float64)
+    if float(np.linalg.norm(v)) < 1e-9:
+        raise ValueError("shoulder and wrist are coincident; cannot compute rotation")
     phi = np.arctan2(float(v[2]), float(v[0]))
     if float(v[0]) < 0.0:                       # left arm: side-preserving branch
         phi += np.pi
-    return float((phi + np.pi) % (2.0 * np.pi) - np.pi)   # wrap to (-pi, pi]
+    return float((phi + np.pi) % (2.0 * np.pi) - np.pi)   # wrap to [-pi, pi)
 
 
 def droop_from_horizontal_deg(shoulder, wrist):
@@ -36,7 +39,9 @@ def droop_from_horizontal_deg(shoulder, wrist):
 
 def fallback_y_rotation(side, droop_deg=45.0):
     """Side-correct world-+Y rotation for a canonical `droop_deg` arm, used when
-    bone geometry is degenerate. `side`: 'l' or 'r'."""
+    bone geometry is degenerate. `side`: 'l' or 'r'. Raises ValueError on a bad side."""
+    if side not in ("l", "r"):
+        raise ValueError("side must be 'l' or 'r', got %r" % (side,))
     sx = -1.0 if side == "l" else 1.0
     synthetic_wrist = (sx * np.cos(np.radians(droop_deg)), 0.0,
                        -np.sin(np.radians(droop_deg)))
