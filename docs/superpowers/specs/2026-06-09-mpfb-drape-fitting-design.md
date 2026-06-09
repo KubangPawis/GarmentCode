@@ -1,6 +1,6 @@
 # mpfb_drape — Auto-fit + Auto-drape Garments onto Normalized MPFB Bodies
 
-**Status:** Design approved (brainstorming). Pending plan.
+**Status:** Implemented (as-built). See mpfb_drape/README.md.
 **Date:** 2026-06-09
 **Branch:** `worktree-feat+mpfb-drape`
 **Depends on:** `mpfb_tpose` (DONE), `mpfb_ingest` (DONE), `pygarment` Warp sim (working in this env).
