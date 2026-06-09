@@ -18,30 +18,27 @@ pytestmark = pytest.mark.skipif(not _cuda_available(),
                                 reason="Warp/CUDA not available for full drape")
 
 
+# Production input is an mpfb_ingest'd mpfb_tpose export; the bundled
+# mean_all_tpose body is used here as a true-T-pose stand-in because generating
+# an MPFB T-pose requires Blender (gated elsewhere). This test's sole job is to
+# prove the real Warp drape + verify path works end-to-end on a contract-valid
+# T-pose body.
 def test_end_to_end_drape_tshirt(tmp_path):
-    import ingest_mpfb_body as ingest
     from mpfb_drape import pipeline
 
-    # 1) ingest the committed MPFB base body (auto path, T-pose angle 0)
-    src_obj = REPO / "mpfb_ingest/data/mpfb_base_body.obj"
-    out_bodies = REPO / "assets/bodies"
-    name = "e2e_avatar"
-    ingest.run(str(src_obj), str(out_bodies), name, landmarks_path=None,
-               arm_pose_angle=0.0, save_obj=True, fill_defaults=True)
-    body_yaml = out_bodies / f"{name}.yaml"
-    body_obj = out_bodies / f"{name}.obj"
-    seg_extra = out_bodies / f"{name}_bodyseg.json"
+    bodies = REPO / "assets/bodies"
+    body_yaml = bodies / "mean_all_tpose.yaml"   # a genuine T-pose body
+    body_obj = bodies / "mean_all_tpose.obj"
+    seg_extra = bodies / "mean_all_tpose_bodyseg.json"
+    with open(REPO / "assets/design_params/t-shirt.yaml") as f:
+        design = yaml.safe_load(f)["design"]
 
     try:
-        with open(REPO / "assets/design_params/t-shirt.yaml") as f:
-            design = yaml.safe_load(f)["design"]
         res = pipeline.drape_one(
             body_yaml, body_obj, design, out_dir=tmp_path / "out",
-            bodies_dir=out_bodies, name="tee",
+            bodies_dir=bodies, name="tee",
             sim_props_yaml=REPO / "assets/Sim_props/default_sim_props.yaml")
-
         assert Path(res["sim_obj"]).exists()
         assert res["verdict"]["passed"], res["verdict"]["reasons"]
     finally:
-        for p in (body_yaml, body_obj, seg_extra):
-            p.unlink(missing_ok=True)
+        seg_extra.unlink(missing_ok=True)

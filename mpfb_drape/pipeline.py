@@ -46,6 +46,13 @@ def drape_one(body_yaml, body_obj, design, out_dir, bodies_dir, name,
     # 2) stage avatar + topology-matched body segmentation into the bodies dir
     staged = _stage.stage_body(body_yaml, body_obj, bodies_dir)
 
+    if not staged["arms_detected"]:
+        raise ValueError(
+            f"No lateral arms detected in body '{staged['body_name']}'. "
+            "mpfb_drape requires a true T-pose body (arm_pose_angle ~= 0, e.g. an "
+            "mpfb_tpose export). Arms-down / A-pose bodies are not supported."
+        )
+
     # 3) PathCofig reads the body yaml from system.json's bodies_default_path at
     #    construction, so bodies_dir must be that dir. Override body paths after:
     #    collider = staged avatar obj; segmentation = OUR topology-matched seg.

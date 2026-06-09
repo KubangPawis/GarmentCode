@@ -41,4 +41,5 @@ def stage_body(body_yaml, body_obj, bodies_dir, name=None):
         "obj": str(dst_obj),
         "yaml": str(dst_yaml),
         "body_seg": str(seg_path),
+        "arms_detected": bodyseg.arms_detected(seg),
     }
