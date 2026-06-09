@@ -81,3 +81,42 @@ def drape_one(body_yaml, body_obj, design, out_dir, bodies_dir, name,
         "sim_obj": str(paths.g_sim),
         "sim_glb": str(sim_glb) if sim_glb.exists() else None,
     }
+
+
+import yaml as _yaml
+from mpfb_drape import manifest as _manifest
+
+DEFAULT_BODIES_DIR = "assets/bodies"
+
+
+def resolve_designs(designs):
+    """Accept a dir, a single file, or a list of dirs/files -> sorted file list."""
+    if isinstance(designs, (str, Path)):
+        designs = [designs]
+    out = []
+    for d in designs:
+        d = Path(d)
+        if d.is_dir():
+            out.extend(sorted(d.glob("*.yaml")))
+        else:
+            out.append(d)
+    return out
+
+
+def drape_wardrobe(body_yaml, body_obj, designs, out_dir, sim_props_yaml,
+                   bodies_dir=DEFAULT_BODIES_DIR, render=False):
+    """Drape many designs onto one avatar; write + return the manifest."""
+    out_dir = Path(out_dir)
+    out_dir.mkdir(parents=True, exist_ok=True)
+    results, body_name = [], None
+    for design_file in resolve_designs(designs):
+        design = _yaml.safe_load(Path(design_file).read_text())["design"]
+        name = Path(design_file).stem
+        res = drape_one(body_yaml, body_obj, design, out_dir=out_dir,
+                        bodies_dir=bodies_dir, name=name,
+                        sim_props_yaml=sim_props_yaml, render=render)
+        body_name = res["body_name"]
+        results.append(res)
+    man = _manifest.build(body_name, results)
+    _manifest.write(man, out_dir / "wardrobe_manifest.json")
+    return man

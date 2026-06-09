@@ -58,3 +58,42 @@ def test_drape_one_injects_seg_and_returns_record(tmp_path):
         assert json.loads(Path(captured["body_seg"]).read_text())  # valid seg json
     finally:
         seg_extra.unlink(missing_ok=True)
+
+
+def test_resolve_designs_accepts_list_and_dir(tmp_path):
+    d = tmp_path / "d"; d.mkdir()
+    (d / "a.yaml").write_text("design: {}")
+    (d / "b.yaml").write_text("design: {}")
+    assert len(pipeline.resolve_designs([d])) == 2
+    assert len(pipeline.resolve_designs([d / "a.yaml"])) == 1
+
+
+def test_drape_wardrobe_folder_and_manifest(tmp_path, monkeypatch):
+    body_dir = tmp_path / "in"; body_dir.mkdir()
+    obj = body_dir / "avatar.obj"
+    import trimesh as _tm
+    _tm.creation.box(extents=[0.4, 1.6, 0.2]).export(str(obj))
+    yml = body_dir / "avatar.yaml"
+    yml.write_text("body:\n  height: 172.0\n  arm_pose_angle: 0.0\n")
+
+    designs_dir = tmp_path / "designs"; designs_dir.mkdir()
+    (designs_dir / "t-shirt.yaml").write_text(
+        (REPO / "assets/design_params" / "t-shirt.yaml").read_text())
+
+    calls = []
+
+    def fake_drape_one(*a, **k):
+        calls.append(k.get("name"))
+        return {"design": k.get("name"), "body_name": "avatar",
+                "verdict": {"passed": True, "reasons": [], "metrics": {}},
+                "out_folder": "x", "sim_obj": "x", "sim_glb": None}
+
+    monkeypatch.setattr(pipeline, "drape_one", fake_drape_one)
+    man = pipeline.drape_wardrobe(
+        yml, obj, designs_dir, out_dir=tmp_path / "out",
+        bodies_dir=tmp_path / "bodies", sim_props_yaml=DEFAULT_SIM)
+
+    assert man["summary"]["total"] == 1
+    assert man["summary"]["passed"] == 1
+    assert (tmp_path / "out" / "wardrobe_manifest.json").exists()
+    assert calls == ["t-shirt"]   # design name = file stem
