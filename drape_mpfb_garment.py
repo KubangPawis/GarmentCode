@@ -13,7 +13,7 @@ import argparse
 import sys
 from pathlib import Path
 
-DEFAULT_SIM_PROPS = "assets/Sim_props/default_sim_props.yaml"
+DEFAULT_SIM_PROPS = "assets/Sim_props/mpfb_drape_sim_props.yaml"
 
 
 def main(argv=None):
