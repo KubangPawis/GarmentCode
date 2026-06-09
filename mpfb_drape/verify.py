@@ -10,7 +10,11 @@ from pathlib import Path
 import numpy as np
 import trimesh
 
-BBOX_MARGIN = 0.30  # metres of slack around the body bbox before "fly-away"
+# The GarmentCode sim writes the draped garment in centimetres, while the body
+# collider OBJ is in metres (the sim scales it by b_scale=100 internally). Bring
+# the body bbox into the garment's cm units before comparing.
+BODY_OBJ_SCALE_TO_CM = 100.0
+BBOX_MARGIN_CM = 30.0  # slack (cm) around the body before declaring fly-away
 
 
 def acceptance(stats, design_name, sim_obj_path, body_obj_path,
@@ -49,9 +53,10 @@ def acceptance(stats, design_name, sim_obj_path, body_obj_path,
         reasons.append("non_finite_vertices (nan/inf)")
     else:
         body = trimesh.load(str(body_obj_path), process=False, force="mesh")
-        bmin, bmax = np.asarray(body.bounds[0]), np.asarray(body.bounds[1])
+        bmin = np.asarray(body.bounds[0]) * BODY_OBJ_SCALE_TO_CM
+        bmax = np.asarray(body.bounds[1]) * BODY_OBJ_SCALE_TO_CM
         gmin, gmax = v.min(axis=0), v.max(axis=0)
-        if (gmin < bmin - BBOX_MARGIN).any() or (gmax > bmax + BBOX_MARGIN).any():
+        if (gmin < bmin - BBOX_MARGIN_CM).any() or (gmax > bmax + BBOX_MARGIN_CM).any():
             reasons.append("bbox_outside_body (fly-away/explosion)")
 
     return {"passed": len(reasons) == 0, "reasons": reasons, "metrics": metrics}

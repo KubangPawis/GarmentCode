@@ -20,15 +20,16 @@ def _body_obj(tmp_path):
     return p
 
 
-def test_pass_when_clean(tiny_obj, tmp_path):
-    body = _body_obj(tmp_path)
-    # tiny_obj is in cm (Y~100..110); shrink to sit inside the metre body bbox
-    m = trimesh.load(str(tiny_obj), process=False, force="mesh")
-    m.apply_scale(0.01)
-    m.export(str(tiny_obj))
-    v = verify.acceptance(_stats("g"), "g", tiny_obj, body,
+def test_pass_when_clean(tmp_path):
+    body = _body_obj(tmp_path)              # ~1.7 m box body (metres)
+    import trimesh, numpy as np
+    # a small garment in CENTIMETRES sitting on the chest (inside body x100 cm bbox)
+    g = trimesh.creation.box(extents=[40.0, 50.0, 25.0])
+    g.apply_translation([0, 120.0, 0])      # y=120 cm, within body 0..170 cm
+    p = tmp_path / "clean_sim.obj"; g.export(str(p))
+    v = verify.acceptance(_stats("g"), "g", p, body,
                           max_body_collisions=35, max_self_collisions=300)
-    assert v["passed"] is True
+    assert v["passed"] is True, v["reasons"]
     assert v["reasons"] == []
 
 
@@ -58,10 +59,13 @@ def test_fail_on_nan(tmp_path):
                for r in res["reasons"])
 
 
-def test_fail_on_flyaway_bbox(tiny_obj, tmp_path):
-    body = _body_obj(tmp_path)
-    # tiny_obj at Y~100 m relative to a 1.7 m body -> way outside -> fly-away
-    v = verify.acceptance(_stats("g"), "g", tiny_obj, body, 35, 300)
+def test_fail_on_flyaway_bbox(tmp_path):
+    body = _body_obj(tmp_path)              # body x ~[-0.3,0.3] m -> [-30,30] cm
+    import trimesh
+    g = trimesh.creation.box(extents=[10.0, 10.0, 10.0])
+    g.apply_translation([500.0, 120.0, 0])  # x=500 cm, far outside body cm bbox+margin
+    p = tmp_path / "fly_sim.obj"; g.export(str(p))
+    v = verify.acceptance(_stats("g"), "g", p, body, 35, 300)
     assert v["passed"] is False
     assert any("bbox" in r or "outside" in r for r in v["reasons"])
 
