@@ -112,7 +112,7 @@ Output: a dict in the exact ggg shape (six keys → index lists), serialized to 
 5. **Verify**: `verify.acceptance(props_stats, paths.g_sim, paths.in_body_obj)`.
 6. Return a result record: `{design, verdict, metrics, out_folder, sim_glb}`.
 
-Sim props start from `assets/Sim_props/default_sim_props.yaml` via the project's `Properties`/`init_sim_props` defaults (attachment + collision filters on). `render=False` by default for batch speed; `--render` enables the existing render step.
+Sim props start from `assets/Sim_props/default_sim_props.yaml` via the project's `Properties`/`init_sim_props` defaults (attachment + collision filters on). **As-built:** rendering (preview PNGs) is performed per design by the reused `template_simulation`; a render-off batch-speed mode is documented future work. The `--render` flag and `--bodies-dir` knob described in the original spec were dropped: rendering is always on, and the avatar is staged automatically into `system.json`'s `bodies_default_path` under a namespaced `_mpfbdrape_<stem>` prefix (cleaned up in a `finally`).
 
 Units are verified compatible end-to-end: avatar metres → `b_scale` ×100 → cm; garment boxmesh already in cm.
 

@@ -4,10 +4,11 @@ Usage:
   .venv/bin/python drape_mpfb_garment.py \
       --body assets/bodies/avatar.yaml \
       --designs assets/design_params/ \
-      --out .temp/wardrobe [--body-obj path] [--sim-props ...] [--render]
+      --out .temp/wardrobe [--body-obj path] [--sim-props ...]
 
 --designs accepts a directory (every *.yaml) or explicit file paths.
 Pass a true-T-pose avatar ingested with `--arm-pose-angle 0`.
+GarmentCode's preview render (front/back PNGs) runs per design as part of the sim.
 """
 import argparse
 import sys
@@ -23,9 +24,7 @@ def main(argv=None):
     ap.add_argument("--body-obj", default=None, help="collider OBJ (default: sibling <body>.obj)")
     ap.add_argument("--designs", nargs="+", required=True, help="design YAML dir or files")
     ap.add_argument("--out", required=True, help="output dir for the wardrobe run")
-    ap.add_argument("--bodies-dir", default="assets/bodies", help="where to stage the avatar")
     ap.add_argument("--sim-props", default=DEFAULT_SIM_PROPS)
-    ap.add_argument("--render", action="store_true")
     a = ap.parse_args(argv)
 
     from mpfb_drape import pipeline
@@ -42,8 +41,7 @@ def main(argv=None):
         ap.error(f"no design YAMLs found in: {a.designs}")
 
     man = pipeline.drape_wardrobe(
-        body_yaml, body_obj, designs, out_dir=a.out,
-        sim_props_yaml=a.sim_props, bodies_dir=a.bodies_dir, render=a.render)
+        body_yaml, body_obj, designs, out_dir=a.out, sim_props_yaml=a.sim_props)
 
     s = man["summary"]
     print(f"DRAPE_DONE total={s['total']} passed={s['passed']} failed={s['failed']} "

@@ -42,10 +42,12 @@ separable from the torso and segmentation silently under-labels them.
 
 ### body_stage.py
 
-`stage_body(body_obj, body_yaml, out_dir)` copies the avatar `.obj` + `.yaml` into
-GarmentCode's `assets/bodies/` directory (so `PathCofig` resolves them by name) and
-writes `<name>_bodyseg.json` alongside. Returns the staged paths and the `arms_detected`
-flag.
+`stage_body(body_obj, body_yaml, out_dir, name=None)` copies the avatar `.obj` + `.yaml`
+into GarmentCode's `assets/bodies/` directory (the path `PathCofig` reads from
+`system.json` at construction) under a namespaced name and writes `<name>_bodyseg.json`
+alongside. Returns the staged paths and the `arms_detected` flag. `pipeline.py` uses the
+`_mpfbdrape_<stem>` prefix so the staged files can never collide with a bundled body;
+they are removed in a `finally` block after the sim completes.
 
 ### fit.py
 
@@ -104,8 +106,7 @@ error before entering the Warp sim.
     --designs assets/design_params/ \
     --out   .temp/wardrobe \
     [--body-obj path/to/avatar.obj] \
-    [--sim-props path/to/sim_props.yaml] \
-    [--render]
+    [--sim-props path/to/sim_props.yaml]
 ```
 
 - `--body` — `mpfb_ingest` measurements YAML. The sibling `<body>.obj` is used as the
@@ -113,7 +114,11 @@ error before entering the Warp sim.
 - `--designs` — a directory (every `*.yaml` is draped) or one or more explicit files.
 - `--out` — output root; one sub-folder per design is created automatically.
 - `--sim-props` — defaults to `assets/Sim_props/mpfb_drape_sim_props.yaml`.
-- `--render` — trigger GarmentCode's built-in render pass after draping.
+
+The avatar is staged automatically into GarmentCode's bodies dir (under a namespaced
+`_mpfbdrape_<stem>` name to avoid collisions) and cleaned up after each design.
+GarmentCode's preview render (front/back PNGs) runs per design as part of
+`template_simulation`; a render-off batch-speed mode is documented future work.
 
 ## Pose convention — T-pose required
 
