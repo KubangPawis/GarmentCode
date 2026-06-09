@@ -1,3 +1,4 @@
+import json
 import numpy as np
 from mpfb_drape import bodyseg
 
@@ -59,3 +60,18 @@ def test_derive_then_segment_matches_geometry(tpose_cm):
     seg = bodyseg.segment_by_thresholds(v, arm_x, crotch_y)
     assert seg["right_arm"] and seg["left_arm"]
     assert all(v[i, 0] > arm_x for i in seg["right_arm"])
+
+
+def test_build_segmentation_from_mesh(tpose_cm):
+    seg = bodyseg.build_segmentation(np.asarray(tpose_cm.vertices))
+    assert set(seg) == GGG_KEYS
+    assert seg["right_arm"] and seg["left_leg"]
+
+
+def test_write_segmentation_json_shape(tpose_cm, tmp_path):
+    seg = bodyseg.build_segmentation(np.asarray(tpose_cm.vertices))
+    out = tmp_path / "avatar_bodyseg.json"
+    bodyseg.write_segmentation(seg, out)
+    loaded = json.loads(out.read_text())
+    assert set(loaded) == GGG_KEYS
+    assert all(isinstance(i, int) for i in loaded["body"])

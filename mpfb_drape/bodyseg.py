@@ -11,6 +11,8 @@ Approach: geometric, topology-agnostic. The avatar is a known true T-pose
 collision filters union both sides, so the sim is insensitive to that choice.
 """
 from __future__ import annotations
+import json as _json
+from pathlib import Path as _Path
 import numpy as np
 
 REGION_KEYS = ("body", "left_arm", "right_arm", "left_leg", "right_leg", "face_internal")
@@ -91,3 +93,16 @@ def derive_thresholds(vertices):
 
     crotch_y = ymin + 0.5 * height
     return arm_x, crotch_y
+
+
+def build_segmentation(vertices):
+    """Full pipeline: derive thresholds, then partition into ggg regions."""
+    arm_x, crotch_y = derive_thresholds(vertices)
+    return segment_by_thresholds(vertices, arm_x, crotch_y)
+
+
+def write_segmentation(seg, path):
+    """Write the segmentation dict as ggg-shaped JSON ({region: [int,...]})."""
+    path = _Path(path)
+    path.write_text(_json.dumps({k: list(map(int, v)) for k, v in seg.items()}))
+    return path
