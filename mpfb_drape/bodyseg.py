@@ -66,10 +66,10 @@ def derive_thresholds(vertices):
         gaps = np.diff(ax)
         gi = int(np.argmax(gaps))
 
-        # The largest gap may be INTERIOR to an arm cylinder (arm end-caps sit at
-        # both extremes of |X|, leaving a hollow span in the sorted distribution).
-        # If so, the true torso/arm boundary gap is just to the LEFT of ax[gi].
-        # Find the last strictly smaller value before ax[gi]:
+        # The largest gap may land INTERIOR to a sparse arm region (two large gaps
+        # in sequence, the preceding one being the true torso/arm boundary). In a
+        # sorted array this is equivalent to checking whether gaps[gi-1] is
+        # substantial. Find the last value strictly below ax[gi]:
         left_val = ax[gi]
         lo = gi
         while lo > 0 and ax[lo] >= left_val:
