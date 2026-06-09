@@ -42,3 +42,20 @@ def test_indices_in_range_and_face_internal_empty(tpose_cm):
     for k in GGG_KEYS:
         assert all(0 <= i < len(v) for i in seg[k])
         assert all(isinstance(i, int) for i in seg[k])
+
+
+def test_derive_thresholds_finds_arm_gap(tpose_cm):
+    v = np.asarray(tpose_cm.vertices)
+    arm_x, crotch_y = bodyseg.derive_thresholds(v)
+    # torso half-width is 16, arms start at 17 -> the cut sits in (16, 17)
+    assert 16.0 <= arm_x <= 17.0
+    # crotch at half height (~86 cm for this ~172 cm humanoid)
+    assert 70.0 < crotch_y < 100.0
+
+
+def test_derive_then_segment_matches_geometry(tpose_cm):
+    v = np.asarray(tpose_cm.vertices)
+    arm_x, crotch_y = bodyseg.derive_thresholds(v)
+    seg = bodyseg.segment_by_thresholds(v, arm_x, crotch_y)
+    assert seg["right_arm"] and seg["left_arm"]
+    assert all(v[i, 0] > arm_x for i in seg["right_arm"])

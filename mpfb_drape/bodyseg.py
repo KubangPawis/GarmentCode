@@ -47,3 +47,47 @@ def segment_by_thresholds(vertices, arm_x, crotch_y):
         "right_leg": idx(is_leg & right),
         "face_internal": [],
     }
+
+
+def derive_thresholds(vertices):
+    """Estimate (arm_x, crotch_y) geometrically from a T-pose mesh.
+
+    arm_x: largest gap in sorted |X| over the upper half (torso vs arms).
+    crotch_y: half the stature above the ground.
+    """
+    v = np.asarray(vertices, dtype=float)
+    y = v[:, 1]
+    ymin, ymax = float(y.min()), float(y.max())
+    height = ymax - ymin
+
+    upper = v[y > ymin + 0.5 * height]
+    ax = np.sort(np.abs(upper[:, 0]))
+    if ax.size >= 2:
+        gaps = np.diff(ax)
+        gi = int(np.argmax(gaps))
+
+        # The largest gap may be INTERIOR to an arm cylinder (arm end-caps sit at
+        # both extremes of |X|, leaving a hollow span in the sorted distribution).
+        # If so, the true torso/arm boundary gap is just to the LEFT of ax[gi].
+        # Find the last strictly smaller value before ax[gi]:
+        left_val = ax[gi]
+        lo = gi
+        while lo > 0 and ax[lo] >= left_val:
+            lo -= 1
+        prev_gap = left_val - ax[lo]
+
+        # 0.5% of height = a gap large enough to be a real anatomical separation
+        small_thresh = 0.005 * height
+        if prev_gap > small_thresh:
+            # Largest gap is arm-interior; the real boundary is this preceding gap
+            arm_x = float(0.5 * (ax[lo] + left_val))
+        elif gaps[gi] > 0.05 * height:
+            # No preceding gap; the largest gap IS the torso/arm boundary
+            arm_x = float(0.5 * (ax[gi] + ax[gi + 1]))
+        else:
+            arm_x = float(ax[-1]) * 1.5  # no separated arms found laterally
+    else:
+        arm_x = float(np.abs(v[:, 0]).max()) * 1.5
+
+    crotch_y = ymin + 0.5 * height
+    return arm_x, crotch_y
