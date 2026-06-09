@@ -16,9 +16,11 @@ ARGS=(--repo "$REPO_WIN")
 while [ $# -gt 0 ]; do
   case "$1" in
     --out-glb|--out-blend)
+      [ $# -lt 2 ] && { echo "ERROR: $1 requires a value" >&2; exit 1; }
       mkdir -p "$(dirname "$2")"
       ARGS+=("$1" "$(wslpath -w "$(realpath -m "$2")")"); shift 2;;
-    *) ARGS+=("$1" "$2"); shift 2;;
+    *) [ $# -lt 2 ] && { echo "ERROR: flag $1 requires a value" >&2; exit 1; }
+       ARGS+=("$1" "$2"); shift 2;;
   esac
 done
 

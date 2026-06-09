@@ -15,7 +15,20 @@ def _argv():
 
 
 def _arg(argv, name, default=None):
-    return argv[argv.index(name) + 1] if name in argv else default
+    if name not in argv:
+        return default
+    i = argv.index(name)
+    if i + 1 >= len(argv):
+        raise ValueError("%s requires a value but is the last argument" % name)
+    return argv[i + 1]
+
+
+def _float_arg(argv, name, default):
+    raw = _arg(argv, name, str(default))
+    try:
+        return float(raw)
+    except ValueError:
+        raise ValueError("%s expects a float, got %r" % (name, raw))
 
 
 def main():
@@ -25,14 +38,14 @@ def main():
 
     out_glb = _arg(argv, "--out-glb", "/tmp/tpose.glb")
     out_blend = _arg(argv, "--out-blend", "/tmp/tpose.blend")
-    fallback = float(_arg(argv, "--fallback-deg", "45"))
+    fallback = _float_arg(argv, "--fallback-deg", 45.0)
     macro = humanmod.macro_dict(
-        gender=float(_arg(argv, "--gender", "0.5")),
-        weight=float(_arg(argv, "--weight", "0.5")),
-        height=float(_arg(argv, "--height", "0.5")),
-        muscle=float(_arg(argv, "--muscle", "0.5")),
-        cupsize=float(_arg(argv, "--cupsize", "0.5")),
-        age=float(_arg(argv, "--age", "0.5")),
+        gender=_float_arg(argv, "--gender", 0.5),
+        weight=_float_arg(argv, "--weight", 0.5),
+        height=_float_arg(argv, "--height", 0.5),
+        muscle=_float_arg(argv, "--muscle", 0.5),
+        cupsize=_float_arg(argv, "--cupsize", 0.5),
+        age=_float_arg(argv, "--age", 0.5),
         race=_arg(argv, "--race", "caucasian"),
     )
     for p in (out_glb, out_blend):
