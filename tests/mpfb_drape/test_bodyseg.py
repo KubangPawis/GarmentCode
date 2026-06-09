@@ -29,6 +29,12 @@ def test_legs_are_low_and_central(tpose_cm):
         assert v[i, 1] < 80.0 and abs(v[i, 0]) <= 16.5
 
 
+def test_region_keys_match_output(tpose_cm):
+    import numpy as np
+    seg = bodyseg.segment_by_thresholds(np.asarray(tpose_cm.vertices), arm_x=16.5, crotch_y=80.0)
+    assert set(seg) == set(bodyseg.REGION_KEYS)
+
+
 def test_indices_in_range_and_face_internal_empty(tpose_cm):
     v = np.asarray(tpose_cm.vertices)
     seg = bodyseg.segment_by_thresholds(v, arm_x=16.5, crotch_y=80.0)

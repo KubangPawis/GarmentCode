@@ -22,7 +22,7 @@ def segment_by_thresholds(vertices, arm_x, crotch_y):
     Args:
         vertices: (N, 3) array, Y-up, in the mesh's own units.
         arm_x:    |X| beyond which a vertex belongs to an arm.
-        crotch_y: Y below which a non-arm vertex belongs to a leg.
+        crotch_y: Y strictly below which a non-arm vertex belongs to a leg.
 
     Returns dict {region_key: sorted list[int]}; complete + disjoint over
     range(N); face_internal is empty (the exported MPFB body has helpers
