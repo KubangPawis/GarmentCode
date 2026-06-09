@@ -1,7 +1,6 @@
 """Blender-side rig operations for T-pose normalization (py3.13). All math is
 delegated to mpfb_tpose.geometry (pure numpy)."""
 import importlib
-import math
 import bpy
 import mathutils
 import numpy as np
@@ -43,10 +42,14 @@ def _rotate_bone_world_y(armature, bone_name, angle):
     """Rotate a pose bone about the world +Y axis through its head (the manual
     'R Y' about the bone head). Works headless (sets pose matrix; no view op)."""
     pb = armature.pose.bones[bone_name]
-    head = pb.matrix.translation.copy()          # armature space == world (rig at origin)
+    # Rotate about world +Y through the bone's WORLD head. Valid for any armature
+    # object transform: reduces to the identity case MPFB gives us (human at
+    # origin), but does not silently tilt the pose if a caller moves the armature.
+    mw = armature.matrix_world
+    head_world = mw @ pb.matrix.translation
     Ry = mathutils.Matrix.Rotation(angle, 4, "Y")
-    T = mathutils.Matrix.Translation(head)
-    pb.matrix = T @ Ry @ T.inverted() @ pb.matrix
+    T = mathutils.Matrix.Translation(head_world)
+    pb.matrix = mw.inverted() @ T @ Ry @ T.inverted() @ mw @ pb.matrix
     bpy.context.view_layer.update()
 
 
@@ -60,8 +63,10 @@ def measure_and_rotate_shoulders(armature, rig_svc, fallback_deg=45.0):
         try:
             shoulder = _bone_head_world(rig_svc, armature, upper)
             wrist = _bone_head_world(rig_svc, armature, hand)
-            if not math.isfinite(float(wrist[0])) or abs(wrist[0] - shoulder[0]) < 1e-6:
-                raise ValueError("degenerate arm geometry")
+            if not np.all(np.isfinite([shoulder, wrist])):
+                raise ValueError("non-finite bone head")
+            # geometry.y_rotation_to_horizontal is the single source of truth for
+            # "degenerate": it raises on coincident shoulder/wrist (caught below).
             angle = geometry.y_rotation_to_horizontal(shoulder, wrist)
         except Exception as e:                   # noqa: BLE001
             print("WARN measure failed (%s): %s -> fallback %.0f deg"

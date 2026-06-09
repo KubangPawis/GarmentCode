@@ -5,6 +5,7 @@
 set -uo pipefail
 BL="/mnt/c/Program Files/Blender Foundation/Blender 5.1/blender.exe"
 REPO_WSL="$(realpath .)"
+[ -f "$1" ] || { echo "script not found: $1" >&2; exit 2; }
 SCRIPT_WSL="$(realpath "$1")"; shift
 REPO_WIN="$(wslpath -w "$REPO_WSL")"
 SCRIPT_WIN="$(wslpath -w "$SCRIPT_WSL")"
